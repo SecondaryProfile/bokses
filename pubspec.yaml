@@ -1,0 +1,39 @@
+name: bokses
+description: A bubbly box storage management app — know what's in every box.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+  path: ^1.8.3
+  path_provider: ^2.1.1
+  image_picker: ^1.0.7
+  share_plus: ^7.2.2
+  file_picker: ^8.0.0
+  uuid: ^4.3.3
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  ios: true
+  android: false
+  remove_alpha_ios: true
+  image_path: "assets/icons/app_icon_light.png"
+  ios_dark_image_path: "assets/icons/app_icon_dark.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/

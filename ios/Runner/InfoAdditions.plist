@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merge these keys into your existing ios/Runner/Info.plist.
+  The camera usage description is required for image_picker camera access.
+  Photo library access is NOT requested since only camera is used.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Bokses uses your camera to take photos of items stored in your boxes.</string>
+
+    <!-- Required by file_picker on iOS for document browsing -->
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <false/>
+    <key>UIFileSharingEnabled</key>
+    <true/>
+
+    <key>CFBundleDisplayName</key>
+    <string>Bokses</string>
+</dict>
+</plist>

@@ -1,0 +1,9 @@
+services:
+  bokses:
+    image: nginx:alpine
+    container_name: bokses
+    restart: unless-stopped
+    ports:
+      - "8743:80"
+    volumes:
+      - /home/third/bokses/web:/usr/share/nginx/html:ro
