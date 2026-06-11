@@ -12,6 +12,12 @@
 .swiftpm/
 migrate_working_dir/
 
+# macOS resource forks
+._*
+
+# Claude Code local settings
+.claude/
+
 # IntelliJ related
 *.iml
 *.ipr
