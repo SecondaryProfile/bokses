@@ -15,6 +15,10 @@ class DatabaseService {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Server returned ${res.statusCode}');
     }
+    final body = res.body.trimLeft();
+    if (body.startsWith('<!') || body.startsWith('<html')) {
+      throw Exception('Backend not reachable');
+    }
   }
 
   // ── Boxes ─────────────────────────────────────────────────

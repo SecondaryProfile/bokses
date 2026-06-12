@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not reach server: $e')),
+          const SnackBar(content: Text('Backend not reachable — data will load when deployed.')),
         );
       }
     }
