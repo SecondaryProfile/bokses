@@ -31,7 +31,9 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   @override
   void initState() {
     super.initState();
-    getApplicationDocumentsDirectory().then((d) => _docsDir = d.path);
+    getApplicationDocumentsDirectory()
+        .then((d) => _docsDir = d.path)
+        .catchError((_) => '');
     _load();
   }
 

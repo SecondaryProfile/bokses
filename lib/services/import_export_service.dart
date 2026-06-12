@@ -8,13 +8,14 @@ import 'package:file_picker/file_picker.dart';
 import '../models/box.dart';
 import '../models/item.dart';
 import 'database_service.dart';
+
+
 import 'web_download.dart' if (dart.library.html) 'web_download_web.dart';
 
 class ImportExportService {
-  static Future<void> exportData({Rect? sharePositionOrigin}) async {
+  static Future<Map<String, dynamic>> buildExportPayload() async {
     final boxes = await DatabaseService.instance.getBoxes();
     final allItems = await DatabaseService.instance.getAllItems();
-
     final itemMaps = await Future.wait(allItems.map((item) async {
       final map = Map<String, dynamic>.from(item.toExportMap());
       if (item.photoPath != null && item.photoPath!.isNotEmpty) {
@@ -23,21 +24,23 @@ class ImportExportService {
         } else {
           final file = File(item.photoPath!);
           if (await file.exists()) {
-            final bytes = await file.readAsBytes();
-            map['photoData'] = base64Encode(bytes);
+            map['photoData'] = base64Encode(await file.readAsBytes());
           }
         }
       }
       return map;
     }));
-
-    final data = {
+    return {
       'version': '1.1',
       'app': 'Bokses',
       'exportedAt': DateTime.now().toIso8601String(),
       'boxes': boxes.map((b) => b.toExportMap()).toList(),
       'items': itemMaps,
     };
+  }
+
+  static Future<void> exportData({Rect? sharePositionOrigin}) async {
+    final data = await buildExportPayload();
 
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
     final timestamp =
@@ -79,10 +82,13 @@ class ImportExportService {
       return 'Could not read file.';
     }
 
+    return processImportJson(jsonStr);
+  }
+
+  static Future<String> processImportJson(String jsonStr) async {
     if (!jsonStr.trimLeft().startsWith('{')) {
       return 'Invalid file — expected a Bokses JSON export.';
     }
-
     final Map<String, dynamic> data = json.decode(jsonStr);
     if (data['app'] != 'Bokses') return 'Invalid Bokses export file.';
 
@@ -96,7 +102,6 @@ class ImportExportService {
           .insertBox(Box.fromMap(Map<String, dynamic>.from(bMap)));
       boxCount++;
     }
-
     for (final iMap in itemMaps) {
       final map = Map<String, dynamic>.from(iMap);
       final photoData = map.remove('photoData') as String?;
@@ -105,7 +110,6 @@ class ImportExportService {
       await DatabaseService.instance.insertItem(Item.fromMap(map));
       itemCount++;
     }
-
     return 'Imported $boxCount box(es) and $itemCount item(s).';
   }
 }

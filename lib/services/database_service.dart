@@ -4,8 +4,9 @@ import '../models/box.dart';
 import '../models/item.dart';
 
 class DatabaseService {
-  static final DatabaseService instance = DatabaseService._internal();
+  static DatabaseService instance = DatabaseService._internal();
   DatabaseService._internal();
+  DatabaseService.forTesting(); // subclasses use this
 
   Uri _api(String path) => Uri.base.resolve(path);
 
