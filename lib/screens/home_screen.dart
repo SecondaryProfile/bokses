@@ -82,17 +82,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    final boxes = await DatabaseService.instance.getBoxes();
-    final counts = <String, int>{};
-    for (final b in boxes) {
-      counts[b.id] = await DatabaseService.instance.getItemCount(b.id);
-    }
-    if (mounted) {
-      setState(() {
-        _boxes = boxes;
-        _itemCounts = counts;
-        _loading = false;
-      });
+    try {
+      final boxes = await DatabaseService.instance.getBoxes();
+      final counts = <String, int>{};
+      for (final b in boxes) {
+        counts[b.id] = await DatabaseService.instance.getItemCount(b.id);
+      }
+      if (mounted) {
+        setState(() {
+          _boxes = boxes;
+          _itemCounts = counts;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not reach server: $e')),
+        );
+      }
     }
   }
 
@@ -367,7 +376,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: AppTheme.background,
         centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: AppTheme.bubblePurple.withValues(alpha: 0.35),
+          ),
+        ),
         leading: _searching
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -384,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textDark,
                 ),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'Search items…',
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -397,14 +417,27 @@ class _HomeScreenState extends State<HomeScreen> {
             : Row(
                 children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
-                      color: AppTheme.boksBlueLight,
+                      gradient: LinearGradient(
+                        colors: [AppTheme.boksBlue, AppTheme.boksRed],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.inventory_2_rounded,
-                        color: AppTheme.boksBlueBright, size: 18),
+                    child: const Center(
+                      child: Text(
+                        'B',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -412,9 +445,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontFamily: kFontFamily,
                       fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                      letterSpacing: 0.5,
-                      color: AppTheme.boksBlueBright,
+                      fontSize: 21,
+                      letterSpacing: -0.3,
+                      color: AppTheme.textDark,
                     ),
                   ),
                 ],
@@ -429,90 +462,103 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
               ]
             : [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: _openSearch,
-          ),
-          PopupMenuButton<String>(
-            key: _menuKey,
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (val) async {
-              if (val == 'export') _doExport();
-              if (val == 'import') _doImport();
-              if (val == 'clear') _doClearAll();
-              if (val == 'settings') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()));
-              }
-              if (val == 'about') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AboutScreen()));
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'export',
-                child: ListTile(
-                  leading: Icon(Icons.upload_rounded),
-                  title: Text('Export Data',
-                      style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w600)),
-                  contentPadding: EdgeInsets.zero,
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: _openSearch,
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          child: Icon(Icons.search_rounded, size: 17),
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 18,
+                        color: AppTheme.bubblePurple,
+                      ),
+                      PopupMenuButton<String>(
+                        key: _menuKey,
+                        padding: EdgeInsets.zero,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          child: Icon(Icons.more_horiz_rounded, size: 17),
+                        ),
+                        onSelected: (val) async {
+                          if (val == 'export') _doExport();
+                          if (val == 'import') _doImport();
+                          if (val == 'clear') _doClearAll();
+                          if (val == 'settings') {
+                            Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                          }
+                          if (val == 'about') {
+                            Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const AboutScreen()));
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: 'export',
+                            child: ListTile(
+                              leading: Icon(Icons.upload_rounded),
+                              title: Text('Export Data',
+                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'import',
+                            child: ListTile(
+                              leading: Icon(Icons.download_rounded),
+                              title: Text('Import Data',
+                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: 'clear',
+                            child: ListTile(
+                              leading: Icon(Icons.delete_sweep_rounded, color: AppTheme.boksRed),
+                              title: Text('Delete All Data',
+                                  style: TextStyle(fontFamily: kFontFamily, color: AppTheme.boksRed, fontWeight: FontWeight.w600)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'settings',
+                            child: ListTile(
+                              leading: Icon(Icons.settings_rounded),
+                              title: Text('Settings',
+                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'about',
+                            child: ListTile(
+                              leading: Icon(Icons.info_outline_rounded),
+                              title: Text('About',
+                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'import',
-                child: ListTile(
-                  leading: Icon(Icons.download_rounded),
-                  title: Text('Import Data',
-                      style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w600)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'clear',
-                child: ListTile(
-                  leading: Icon(Icons.delete_sweep_rounded,
-                      color: AppTheme.boksRed),
-                  title: Text('Delete All Data',
-                      style: TextStyle(
-                          fontFamily: kFontFamily,
-                          color: AppTheme.boksRed,
-                          fontWeight: FontWeight.w600)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'settings',
-                child: ListTile(
-                  leading: Icon(Icons.settings_rounded),
-                  title: Text('Settings',
-                      style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w600)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'about',
-                child: ListTile(
-                  leading: Icon(Icons.info_outline_rounded),
-                  title: Text('About',
-                      style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w600)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-        ],
+              ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
