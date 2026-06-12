@@ -105,13 +105,13 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 14),
 
             _InfoCard(
-              icon: Icons.phone_android_rounded,
+              icon: Icons.dns_rounded,
               iconColor: AppTheme.boksRed,
               iconBg: AppTheme.boksRedLight,
-              title: 'Stored On-Device',
+              title: 'Stored on Your Server',
               body:
-                  'All your box and item data is stored on-device. No accounts, '
-                  'no cloud required, no subscription.',
+                  'All your box and item data lives on your personal server — '
+                  'not in someone else\'s cloud. No accounts, no subscription, no tracking.',
             ).animate().fadeIn(delay: 650.ms).slideY(begin: 0.1, end: 0),
 
             const SizedBox(height: 14),

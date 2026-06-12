@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 import '../models/box.dart';
 import '../models/item.dart';
@@ -12,6 +11,7 @@ import '../constants.dart';
 import 'box_detail_screen.dart';
 import 'about_screen.dart';
 import 'settings_screen.dart';
+import 'version_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -341,39 +341,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _doExport() async {
     try {
-      final result = await ImportExportService.exportData(
-        sharePositionOrigin: _getMenuRect(),
-      );
-      if (kIsWeb && result != null && mounted) {
-        _showWebExportDialog(result);
-      } else if (!kIsWeb) {
-        _showSnack('Export shared!');
-      }
+      await ImportExportService.exportData(sharePositionOrigin: _getMenuRect());
+      _showSnack(kIsWeb ? 'Export downloaded!' : 'Export shared!');
     } catch (e) {
       _showSnack('Export failed: $e');
     }
-  }
-
-  void _showWebExportDialog(String jsonStr) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Export Data',
-            style: TextStyle(
-                fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
-        content: SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            child: SelectableText(jsonStr,
-                style: GoogleFonts.jetBrainsMono(fontSize: 11)),
-          ),
-        ),
-        actions: [
-          ElevatedButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
-        ],
-      ),
-    );
   }
 
   Future<void> _doImport() async {
@@ -435,31 +407,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppTheme.boksBlueBright, size: 18),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'bokses',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                          letterSpacing: 0.5,
-                          color: AppTheme.boksBlueBright,
-                        ),
-                      ),
-                      Text(
-                        'your storage, organized',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textMid,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Bokses',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 17,
+                      letterSpacing: 0.5,
+                      color: AppTheme.boksBlueBright,
+                    ),
                   ),
                 ],
               ),
@@ -568,6 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: _boxes.isEmpty ? _emptyState() : _boxGrid(),
                     ),
+                    _footer(),
                   ],
                 ),
       floatingActionButton: _searching
@@ -579,6 +536,37 @@ class _HomeScreenState extends State<HomeScreen> {
             )
               .animate()
               .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
+    );
+  }
+
+  Widget _footer() {
+    final changes = kChangelog.first.changes;
+    final tooltip = changes.map((c) => '• $c').join('\n');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 80, top: 4),
+      child: Center(
+        child: Tooltip(
+          message: tooltip,
+          waitDuration: Duration.zero,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VersionHistoryScreen()),
+              ),
+              child: Text(
+                'v$kAppVersion',
+                style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 11,
+                  color: AppTheme.textMid.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
