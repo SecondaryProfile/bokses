@@ -1,7 +1,15 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.0.21';
+const String kAppVersion = '0.0.22';
 
 const kChangelog = [
+  (
+    version: '0.0.22',
+    date: '2026-06-11',
+    changes: [
+      'Loading fix — API errors no longer hang the spinner',
+      'Redesigned app bar: gradient B logo, pill action buttons with divider',
+    ],
+  ),
   (
     version: '0.0.21',
     date: '2026-06-11',
