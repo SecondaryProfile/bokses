@@ -1,7 +1,26 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.0.22';
+const String kAppVersion = '0.1.1';
 
 const kChangelog = [
+  (
+    version: '0.1.1',
+    date: '2026-06-18',
+    changes: [
+      'Box sorting — date (oldest/newest) and name (A–Z / Z–A)',
+      'Fragile label — mark boxes with a yellow caution badge',
+      'Web splash screen shows Bokses icon',
+      'Local storage — data saves in the browser, no backend required',
+    ],
+  ),
+  (
+    version: '0.1.0',
+    date: '2026-06-18',
+    changes: [
+      'Android and iOS support',
+      'Configurable server URL in Settings (mobile)',
+      'Comprehensive test suite (89 tests)',
+    ],
+  ),
   (
     version: '0.0.22',
     date: '2026-06-11',

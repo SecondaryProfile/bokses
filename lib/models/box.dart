@@ -2,12 +2,14 @@ class Box {
   final String id;
   String name;
   String? description;
+  bool fragile;
   final DateTime createdAt;
 
   Box({
     required this.id,
     required this.name,
     this.description,
+    this.fragile = false,
     required this.createdAt,
   });
 
@@ -15,6 +17,7 @@ class Box {
         'id': id,
         'name': name,
         'description': description,
+        'fragile': fragile,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -22,6 +25,7 @@ class Box {
         id: map['id'] as String,
         name: map['name'] as String,
         description: map['description'] as String?,
+        fragile: (map['fragile'] as bool?) ?? false,
         createdAt: DateTime.parse(map['createdAt'] as String),
       );
 
@@ -29,6 +33,7 @@ class Box {
         'id': id,
         'name': name,
         'description': description,
+        'fragile': fragile,
         'createdAt': createdAt.toIso8601String(),
       };
 }

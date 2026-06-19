@@ -5,15 +5,11 @@ allprojects {
     }
 }
 
-val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-
+// Redirect build output off ExFAT to local APFS — Gradle requires POSIX file semantics
+val localBuildRoot = "/private/tmp/bokses-gradle"
+rootProject.layout.buildDirectory.set(file(localBuildRoot))
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    project.layout.buildDirectory.set(file("$localBuildRoot/${project.name}"))
 }
 subprojects {
     project.evaluationDependsOn(":app")

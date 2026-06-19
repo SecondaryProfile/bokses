@@ -36,17 +36,4 @@ class SettingsService {
     await p.setInt(_themePresetKey, value);
   }
 
-  static const _serverUrlKey = 'server_url';
-  static const defaultServerUrl = 'http://localhost:8743';
-
-  static Future<String> getServerUrl() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getString(_serverUrlKey) ?? defaultServerUrl;
-  }
-
-  static Future<void> setServerUrl(String value) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_serverUrlKey, value.trimRight().replaceAll(RegExp(r'/+$'), ''));
-  }
-
 }

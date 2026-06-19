@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/box.dart';
 import '../models/item.dart';
 
@@ -9,96 +8,118 @@ class DatabaseService {
   DatabaseService._internal();
   DatabaseService.forTesting(); // subclasses use this
 
-  static String serverUrl = 'http://localhost:8743';
+  static const _boxesKey = 'local_boxes';
+  static const _itemsKey = 'local_items';
 
-  Uri _api(String path) =>
-      kIsWeb ? Uri.base.resolve(path) : Uri.parse('$serverUrl$path');
+  Future<SharedPreferences> _prefs() => SharedPreferences.getInstance();
 
-  static const _json = {'Content-Type': 'application/json'};
+  Future<List<Box>> _readBoxes() async {
+    final raw = (await _prefs()).getString(_boxesKey);
+    if (raw == null) return [];
+    return (json.decode(raw) as List<dynamic>)
+        .map((m) => Box.fromMap(Map<String, dynamic>.from(m as Map)))
+        .toList();
+  }
 
-  void _check(http.Response res) {
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Server returned ${res.statusCode}');
-    }
-    final body = res.body.trimLeft();
-    if (body.startsWith('<!') || body.startsWith('<html')) {
-      throw Exception('Backend not reachable');
-    }
+  Future<void> _writeBoxes(List<Box> boxes) async {
+    await (await _prefs()).setString(
+        _boxesKey, json.encode(boxes.map((b) => b.toMap()).toList()));
+  }
+
+  Future<List<Item>> _readItems() async {
+    final raw = (await _prefs()).getString(_itemsKey);
+    if (raw == null) return [];
+    return (json.decode(raw) as List<dynamic>)
+        .map((m) => Item.fromMap(Map<String, dynamic>.from(m as Map)))
+        .toList();
+  }
+
+  Future<void> _writeItems(List<Item> items) async {
+    await (await _prefs()).setString(
+        _itemsKey, json.encode(items.map((i) => i.toMap()).toList()));
   }
 
   // ── Boxes ─────────────────────────────────────────────────
 
   Future<void> insertBox(Box box) async {
-    _check(await http.put(_api('/api/boxes/${box.id}'),
-        headers: _json, body: json.encode(box.toMap())));
+    final boxes = await _readBoxes();
+    boxes.removeWhere((b) => b.id == box.id);
+    boxes.add(box);
+    await _writeBoxes(boxes);
   }
 
   Future<List<Box>> getBoxes() async {
-    final res = await http.get(_api('/api/boxes'));
-    _check(res);
-    final list = json.decode(res.body) as List<dynamic>;
-    return list.map((m) => Box.fromMap(Map<String, dynamic>.from(m as Map))).toList();
+    final boxes = await _readBoxes();
+    boxes.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return boxes;
   }
 
-  Future<void> updateBox(Box box) async {
-    _check(await http.put(_api('/api/boxes/${box.id}'),
-        headers: _json, body: json.encode(box.toMap())));
-  }
+  Future<void> updateBox(Box box) => insertBox(box);
 
   Future<void> deleteBox(String id) async {
-    _check(await http.delete(_api('/api/boxes/$id')));
+    final boxes = await _readBoxes();
+    boxes.removeWhere((b) => b.id == id);
+    await _writeBoxes(boxes);
+    final items = await _readItems();
+    items.removeWhere((i) => i.boxId == id);
+    await _writeItems(items);
   }
 
   // ── Items ─────────────────────────────────────────────────
 
   Future<void> insertItem(Item item) async {
-    _check(await http.put(_api('/api/items/${item.id}'),
-        headers: _json, body: json.encode(item.toMap())));
+    final items = await _readItems();
+    items.removeWhere((i) => i.id == item.id);
+    items.add(item);
+    await _writeItems(items);
   }
 
   Future<List<Item>> getItemsForBox(String boxId) async {
-    final res = await http.get(_api('/api/items?boxId=$boxId'));
-    _check(res);
-    final list = json.decode(res.body) as List<dynamic>;
-    return list.map((m) => Item.fromMap(Map<String, dynamic>.from(m as Map))).toList();
+    final items = await _readItems();
+    final filtered = items.where((i) => i.boxId == boxId).toList();
+    filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return filtered;
   }
 
   Future<List<Item>> getAllItems() async {
-    final res = await http.get(_api('/api/items'));
-    _check(res);
-    final list = json.decode(res.body) as List<dynamic>;
-    return list.map((m) => Item.fromMap(Map<String, dynamic>.from(m as Map))).toList();
+    final items = await _readItems();
+    items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return items;
   }
 
-  Future<void> updateItem(Item item) async {
-    _check(await http.put(_api('/api/items/${item.id}'),
-        headers: _json, body: json.encode(item.toMap())));
-  }
+  Future<void> updateItem(Item item) => insertItem(item);
 
   Future<void> deleteItem(String id) async {
-    _check(await http.delete(_api('/api/items/$id')));
+    final items = await _readItems();
+    items.removeWhere((i) => i.id == id);
+    await _writeItems(items);
   }
 
   Future<int> getItemCount(String boxId) async {
-    final res = await http.get(_api('/api/items/count/$boxId'));
-    _check(res);
-    return json.decode(res.body) as int;
+    return (await _readItems()).where((i) => i.boxId == boxId).length;
   }
 
   Future<List<({Item item, Box box})>> searchItems(String query) async {
     if (query.length < 3) return [];
-    final res = await http.get(_api('/api/search?q=${Uri.encodeComponent(query)}'));
-    _check(res);
-    final list = json.decode(res.body) as List<dynamic>;
-    return list.map((m) {
-      final entry = m as Map;
-      final item = Item.fromMap(Map<String, dynamic>.from(entry['item'] as Map));
-      final box = Box.fromMap(Map<String, dynamic>.from(entry['box'] as Map));
-      return (item: item, box: box);
-    }).toList();
+    final lowerQ = query.toLowerCase();
+    final items = await _readItems();
+    final boxes = await _readBoxes();
+    final boxMap = {for (final b in boxes) b.id: b};
+    final results = <({Item item, Box box})>[];
+    for (final item in items) {
+      if (item.name.toLowerCase().contains(lowerQ)) {
+        final box = boxMap[item.boxId];
+        if (box != null) results.add((item: item, box: box));
+      }
+    }
+    results.sort(
+        (a, b) => a.item.name.toLowerCase().compareTo(b.item.name.toLowerCase()));
+    return results;
   }
 
   Future<void> clearAll() async {
-    _check(await http.delete(_api('/api/all')));
+    final p = await _prefs();
+    await p.remove(_boxesKey);
+    await p.remove(_itemsKey);
   }
 }

@@ -13,6 +13,8 @@ import 'about_screen.dart';
 import 'settings_screen.dart';
 import 'version_history_screen.dart';
 
+enum BoxSort { dateAsc, dateDesc, nameAsc, nameDesc }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -25,11 +27,28 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int> _itemCounts = {};
   bool _loading = true;
   final _menuKey = GlobalKey();
+  BoxSort _sort = BoxSort.dateAsc;
 
   bool _searching = false;
   final _searchCtrl = TextEditingController();
   List<({Item item, Box box})> _searchResults = [];
   bool _searched = false;
+
+  List<Box> get _sortedBoxes {
+    final list = List<Box>.from(_boxes);
+    switch (_sort) {
+      case BoxSort.dateAsc:
+        return list..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case BoxSort.dateDesc:
+        return list..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case BoxSort.nameAsc:
+        return list
+          ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      case BoxSort.nameDesc:
+        return list
+          ..sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+    }
+  }
 
   @override
   void initState() {
@@ -96,12 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backend not reachable — data will load when deployed.')),
-        );
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -109,87 +123,94 @@ class _HomeScreenState extends State<HomeScreen> {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool fragile = false;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.bubblePurple,
-                      borderRadius: BorderRadius.circular(2),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.bubblePurple,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text('New Box',
-                    style: TextStyle(
-                        fontFamily: kFontFamily,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Box name *'),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Name required';
-                    final name = v.trim().toLowerCase();
-                    if (_boxes.any((b) => b.name.toLowerCase() == name)) {
-                      return 'A box with this name already exists';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Description (optional)'),
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (!formKey.currentState!.validate()) return;
-                      final box = Box(
-                        id: const Uuid().v4(),
-                        name: nameCtrl.text.trim(),
-                        description: descCtrl.text.trim().isEmpty
-                            ? null
-                            : descCtrl.text.trim(),
-                        createdAt: DateTime.now(),
-                      );
-                      await DatabaseService.instance.insertBox(box);
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      await _load();
+                  const SizedBox(height: 20),
+                  const Text('New Box',
+                      style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: nameCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Box name *'),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Name required';
+                      final name = v.trim().toLowerCase();
+                      if (_boxes.any((b) => b.name.toLowerCase() == name)) {
+                        return 'A box with this name already exists';
+                      }
+                      return null;
                     },
-                    child: const Text('Create Box'),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: descCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Description (optional)'),
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                  const SizedBox(height: 16),
+                  _FragileToggleRow(
+                    value: fragile,
+                    onChanged: (v) => setModal(() => fragile = v),
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (!formKey.currentState!.validate()) return;
+                        final box = Box(
+                          id: const Uuid().v4(),
+                          name: nameCtrl.text.trim(),
+                          description: descCtrl.text.trim().isEmpty
+                              ? null
+                              : descCtrl.text.trim(),
+                          fragile: fragile,
+                          createdAt: DateTime.now(),
+                        );
+                        await DatabaseService.instance.insertBox(box);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await _load();
+                      },
+                      child: const Text('Create Box'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -201,83 +222,90 @@ class _HomeScreenState extends State<HomeScreen> {
     final nameCtrl = TextEditingController(text: box.name);
     final descCtrl = TextEditingController(text: box.description ?? '');
     final formKey = GlobalKey<FormState>();
+    bool fragile = box.fragile;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.bubblePurple,
-                      borderRadius: BorderRadius.circular(2),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.bubblePurple,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text('Edit Box',
-                    style: TextStyle(
-                        fontFamily: kFontFamily,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Box name *'),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Name required';
-                    final name = v.trim().toLowerCase();
-                    if (_boxes.any((b) =>
-                        b.id != box.id && b.name.toLowerCase() == name)) {
-                      return 'A box with this name already exists';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Description (optional)'),
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (!formKey.currentState!.validate()) return;
-                      box.name = nameCtrl.text.trim();
-                      box.description = descCtrl.text.trim().isEmpty
-                          ? null
-                          : descCtrl.text.trim();
-                      await DatabaseService.instance.updateBox(box);
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      await _load();
+                  const SizedBox(height: 20),
+                  const Text('Edit Box',
+                      style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Box name *'),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Name required';
+                      final name = v.trim().toLowerCase();
+                      if (_boxes.any(
+                          (b) => b.id != box.id && b.name.toLowerCase() == name)) {
+                        return 'A box with this name already exists';
+                      }
+                      return null;
                     },
-                    child: const Text('Save Changes'),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: descCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Description (optional)'),
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                  const SizedBox(height: 16),
+                  _FragileToggleRow(
+                    value: fragile,
+                    onChanged: (v) => setModal(() => fragile = v),
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (!formKey.currentState!.validate()) return;
+                        box.name = nameCtrl.text.trim();
+                        box.description = descCtrl.text.trim().isEmpty
+                            ? null
+                            : descCtrl.text.trim();
+                        box.fragile = fragile;
+                        await DatabaseService.instance.updateBox(box);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await _load();
+                      },
+                      child: const Text('Save Changes'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -463,7 +491,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ]
             : [
                 Container(
-                  margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  margin:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(20),
@@ -474,9 +503,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       InkWell(
                         onTap: _openSearch,
-                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                        borderRadius: const BorderRadius.horizontal(
+                            left: Radius.circular(20)),
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           child: Icon(Icons.search_rounded, size: 17),
                         ),
                       ),
@@ -489,7 +520,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         key: _menuKey,
                         padding: EdgeInsets.zero,
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           child: Icon(Icons.more_horiz_rounded, size: 17),
                         ),
                         onSelected: (val) async {
@@ -497,12 +529,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (val == 'import') _doImport();
                           if (val == 'clear') _doClearAll();
                           if (val == 'settings') {
-                            Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const SettingsScreen()));
                           }
                           if (val == 'about') {
-                            Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => const AboutScreen()));
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const AboutScreen()));
                           }
                         },
                         itemBuilder: (_) => [
@@ -511,7 +547,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListTile(
                               leading: Icon(Icons.upload_rounded),
                               title: Text('Export Data',
-                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -520,7 +558,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListTile(
                               leading: Icon(Icons.download_rounded),
                               title: Text('Import Data',
-                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -528,9 +568,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           PopupMenuItem(
                             value: 'clear',
                             child: ListTile(
-                              leading: Icon(Icons.delete_sweep_rounded, color: AppTheme.boksRed),
+                              leading: Icon(Icons.delete_sweep_rounded,
+                                  color: AppTheme.boksRed),
                               title: Text('Delete All Data',
-                                  style: TextStyle(fontFamily: kFontFamily, color: AppTheme.boksRed, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      color: AppTheme.boksRed,
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -540,7 +584,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListTile(
                               leading: Icon(Icons.settings_rounded),
                               title: Text('Settings',
-                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -549,7 +595,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListTile(
                               leading: Icon(Icons.info_outline_rounded),
                               title: Text('About',
-                                  style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -568,7 +616,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _summaryBar(),
                     Expanded(
-                      child: _boxes.isEmpty ? _emptyState() : _boxGrid(),
+                      child:
+                          _boxes.isEmpty ? _emptyState() : _boxGrid(),
                     ),
                     _footer(),
                   ],
@@ -581,7 +630,10 @@ class _HomeScreenState extends State<HomeScreen> {
               label: const Text('New Box'),
             )
               .animate()
-              .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
+              .scale(
+                  delay: 300.ms,
+                  duration: 400.ms,
+                  curve: Curves.elasticOut),
     );
   }
 
@@ -665,7 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _StatChip(
                 icon: Icons.search_rounded,
-                label: '${_searchResults.length} result${_searchResults.length == 1 ? '' : 's'}',
+                label:
+                    '${_searchResults.length} result${_searchResults.length == 1 ? '' : 's'}',
                 color: AppTheme.boksBlueBright,
                 bgColor: AppTheme.boksBlueLight,
               ),
@@ -686,7 +739,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () async {
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => BoxDetailScreen(box: r.box)),
+                    MaterialPageRoute(
+                        builder: (_) => BoxDetailScreen(box: r.box)),
                   );
                 },
               );
@@ -715,6 +769,11 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '$totalItems item${totalItems == 1 ? '' : 's'}',
             color: AppTheme.boksRedBright,
             bgColor: AppTheme.boksRedLight,
+          ),
+          const Spacer(),
+          _SortButton(
+            sort: _sort,
+            onChanged: (s) => setState(() => _sort = s),
           ),
         ],
       ),
@@ -759,6 +818,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _boxGrid() {
+    final boxes = _sortedBoxes;
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -767,9 +827,9 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisSpacing: 14,
         childAspectRatio: 0.82,
       ),
-      itemCount: _boxes.length,
+      itemCount: boxes.length,
       itemBuilder: (_, i) {
-        final box = _boxes[i];
+        final box = boxes[i];
         final count = _itemCounts[box.id] ?? 0;
         return _BoxCard(
           box: box,
@@ -789,6 +849,181 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ── Sort button ────────────────────────────────────────────────────────────────
+
+class _SortButton extends StatelessWidget {
+  final BoxSort sort;
+  final ValueChanged<BoxSort> onChanged;
+
+  const _SortButton({required this.sort, required this.onChanged});
+
+  static const _labels = {
+    BoxSort.dateAsc: 'Oldest first',
+    BoxSort.dateDesc: 'Newest first',
+    BoxSort.nameAsc: 'A → Z',
+    BoxSort.nameDesc: 'Z → A',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<BoxSort>(
+      initialValue: sort,
+      onSelected: onChanged,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, size: 13, color: AppTheme.textMid),
+            const SizedBox(width: 4),
+            Text(
+              _labels[sort]!,
+              style: TextStyle(
+                fontFamily: kFontFamily,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textMid,
+              ),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (_) => BoxSort.values.map((s) {
+        final selected = s == sort;
+        return PopupMenuItem(
+          value: s,
+          child: Row(
+            children: [
+              Icon(
+                s == BoxSort.nameAsc || s == BoxSort.nameDesc
+                    ? Icons.sort_by_alpha_rounded
+                    : s == BoxSort.dateAsc
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                size: 16,
+                color: selected ? AppTheme.boksBlueBright : AppTheme.textMid,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _labels[s]!,
+                style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
+                  color:
+                      selected ? AppTheme.boksBlueBright : AppTheme.textDark,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── Fragile toggle row (used in dialogs) ───────────────────────────────────────
+
+class _FragileToggleRow extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _FragileToggleRow({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const FragileBadge(),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Mark as fragile',
+            style: TextStyle(
+              fontFamily: kFontFamily,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textDark,
+            ),
+          ),
+        ),
+        Switch(
+          value: value,
+          activeThumbColor: AppTheme.boksBlue,
+          activeTrackColor: AppTheme.boksBlueLight,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Fragile badge ──────────────────────────────────────────────────────────────
+
+class FragileBadge extends StatelessWidget {
+  const FragileBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 22,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(color: Color(0xFFFFCC00)),
+          child: CustomPaint(
+            painter: _StripePainter(),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Center(
+                child: Text(
+                  'FRAGILE',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                    letterSpacing: 1.5,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StripePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.13);
+    const stripeW = 5.0;
+    const gap = 8.0;
+    for (double x = -size.height; x < size.width + size.height; x += stripeW + gap) {
+      final path = Path()
+        ..moveTo(x, 0)
+        ..lineTo(x + stripeW, 0)
+        ..lineTo(x + stripeW + size.height, size.height)
+        ..lineTo(x + size.height, size.height)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+// ── Stat chip ──────────────────────────────────────────────────────────────────
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
@@ -831,6 +1066,8 @@ class _StatChip extends StatelessWidget {
   }
 }
 
+// ── Box card ───────────────────────────────────────────────────────────────────
+
 class _BoxCard extends StatelessWidget {
   final Box box;
   final int itemCount;
@@ -869,8 +1106,8 @@ class _BoxCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top row: icon + menu (no count badge)
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 44,
@@ -882,6 +1119,8 @@ class _BoxCard extends StatelessWidget {
                     child: Icon(Icons.inventory_2_rounded,
                         color: accentColor, size: 24),
                   ),
+                  const SizedBox(width: 6),
+                  if (box.fragile) const FragileBadge(),
                   const Spacer(),
                   PopupMenuButton<String>(
                     icon: Icon(Icons.more_horiz_rounded,
@@ -920,7 +1159,6 @@ class _BoxCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              // 5×4 grid of dots that fills all remaining vertical space
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -958,7 +1196,6 @@ class _BoxCard extends StatelessWidget {
                   }),
                 ),
               ),
-              // Box name
               Text(
                 box.name,
                 style: TextStyle(
@@ -1004,6 +1241,8 @@ class _BoxCard extends StatelessWidget {
   }
 }
 
+// ── Search result tile ─────────────────────────────────────────────────────────
+
 class _ResultTile extends StatelessWidget {
   final Item item;
   final Box box;
@@ -1040,7 +1279,8 @@ class _ResultTile extends StatelessWidget {
                 color: AppTheme.boksBlueLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.label_rounded, color: AppTheme.boksBlue, size: 20),
+              child:
+                  Icon(Icons.label_rounded, color: AppTheme.boksBlue, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1061,7 +1301,8 @@ class _ResultTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.inventory_2_rounded, size: 12, color: AppTheme.textMid),
+                      Icon(Icons.inventory_2_rounded,
+                          size: 12, color: AppTheme.textMid),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -1075,12 +1316,17 @@ class _ResultTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (box.fragile) ...[
+                        const SizedBox(width: 6),
+                        const FragileBadge(),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppTheme.textMid, size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: AppTheme.textMid, size: 20),
           ],
         ),
       ),
@@ -1090,6 +1336,8 @@ class _ResultTile extends StatelessWidget {
         .slideX(begin: 0.05, end: 0);
   }
 }
+
+// ── Highlighted text ───────────────────────────────────────────────────────────
 
 class _HighlightedText extends StatelessWidget {
   final String text;
