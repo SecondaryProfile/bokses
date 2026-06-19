@@ -1,7 +1,7 @@
 name: bokses
 description: A bubbly box storage management app — know what's in every box.
 publish_to: 'none'
-version: 0.1.1+1
+version: 0.1.2+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   web: ^1.0.0
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.2
   shared_preferences: ^2.2.2
   path: ^1.8.3
   path_provider: ^2.1.1
@@ -29,7 +31,7 @@ dev_dependencies:
 
 flutter_launcher_icons:
   ios: true
-  android: false
+  android: true
   remove_alpha_ios: true
   image_path: "assets/icons/app_icon_light.png"
   ios_dark_image_path: "assets/icons/app_icon_dark.png"

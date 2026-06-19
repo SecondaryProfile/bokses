@@ -1,5 +1,22 @@
 # Bokses — Changelog
 
+## 0.1.2 — 2026-06-19
+
+### Added
+- App icon updated to the Bokses icon on both iOS and Android
+- Android splash screen now shows the Bokses icon centered on a dark background
+- BoksTalk — voice-to-item mode on box detail screen. Tap the BoksTalk FAB to open a listening session; say an item name and after a configurable silence window it automatically adds the item and loops back to listening. Cancel manually when done.
+- BoksTalk settings — silence timeout slider (0.5s–5.0s, default 1.5s) and a Read Back toggle that speaks the heard text aloud before adding
+
+### Changed
+- App bar logo removed; "Bokses" title now renders as a gradient from the primary to the accent theme color
+- Box cards now gradient across the full sorted list — first card is the primary color, last is the accent, cards in between blend proportionally; reordering the list updates all colors
+- New Box button redesigned as a gradient pill matching the title gradient
+- Export filename now uses a compact timestamp (`bokses_export_YYYYMMDD_HHMMSS.json`) with no spaces
+- Export now opens a native save-to-filesystem dialog (iOS Files app, Android document picker, macOS/Windows save dialog) instead of defaulting to a share sheet; share sheet is used only as a fallback
+
+---
+
 ## 0.1.1 — 2026-06-18
 
 ### Added

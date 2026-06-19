@@ -14,6 +14,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _cvEnabled = false;
   bool _isDark = true;
   int _presetIndex = 0;
+  int _talkSilenceMs = SettingsService.defaultTalkSilenceMs;
+  bool _talkReadBack = false;
+
   @override
   void initState() {
     super.initState();
@@ -24,20 +27,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cv = await SettingsService.getCvEnabled();
     final dark = await SettingsService.getIsDarkMode();
     final preset = await SettingsService.getThemePreset();
+    final silenceMs = await SettingsService.getTalkSilenceMs();
+    final readBack = await SettingsService.getTalkReadBack();
     if (!mounted) return;
     setState(() {
       _cvEnabled = cv;
       _isDark = dark;
       _presetIndex = preset;
+      _talkSilenceMs = silenceMs;
+      _talkReadBack = readBack;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
         children: [
@@ -59,26 +64,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: AppTheme.boksBlueLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.dark_mode_rounded,
-                      color: AppTheme.boksBlue, size: 20),
+                  child: Icon(
+                    Icons.dark_mode_rounded,
+                    color: AppTheme.boksBlue,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Dark Mode',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textDark)),
+                      Text(
+                        'Dark Mode',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('Toggle between dark and light theme',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 12,
-                              color: AppTheme.textMid)),
+                      Text(
+                        'Toggle between dark and light theme',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 12,
+                          color: AppTheme.textMid,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -143,8 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontFamily: kFontFamily,
                           fontSize: 11,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           color: selected
                               ? AppTheme.boksBlueBright
                               : AppTheme.textMid,
@@ -175,26 +190,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: AppTheme.boksBlueLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.auto_awesome_rounded,
-                      color: AppTheme.boksBlue, size: 20),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: AppTheme.boksBlue,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Computer Vision',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textDark)),
+                      Text(
+                        'Computer Vision',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('Identify items from photos using on-device AI',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 12,
-                              color: AppTheme.textMid)),
+                      Text(
+                        'Identify items from photos using on-device AI',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 12,
+                          color: AppTheme.textMid,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -268,6 +292,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          _sectionHeader('BOKSTALK'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.boksBlueLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.timer_rounded,
+                        color: AppTheme.boksBlue,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        'Silence Timeout',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${(_talkSilenceMs / 1000).toStringAsFixed(1)}s',
+                      style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.boksBlueBright,
+                      ),
+                    ),
+                  ],
+                ),
+                Slider(
+                  value: _talkSilenceMs.toDouble(),
+                  min: 500,
+                  max: 5000,
+                  divisions: 9,
+                  activeColor: AppTheme.boksBlue,
+                  inactiveColor: AppTheme.boksBlueLight,
+                  onChanged: (v) => setState(() => _talkSilenceMs = v.round()),
+                  onChangeEnd: (v) =>
+                      SettingsService.setTalkSilenceMs(v.round()),
+                ),
+                Text(
+                  'Stop listening after this long with no speech',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontSize: 12,
+                    color: AppTheme.textMid,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Divider(color: AppTheme.bubblePurple),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.boksRedLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.volume_up_rounded,
+                        color: AppTheme.boksRed,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Read Back',
+                            style: TextStyle(
+                              fontFamily: kFontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Speak the heard words aloud before adding',
+                            style: TextStyle(
+                              fontFamily: kFontFamily,
+                              fontSize: 12,
+                              color: AppTheme.textMid,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _talkReadBack,
+                      activeThumbColor: AppTheme.boksRed,
+                      activeTrackColor: AppTheme.boksRedLight,
+                      onChanged: (v) async {
+                        await SettingsService.setTalkReadBack(v);
+                        setState(() => _talkReadBack = v);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -300,8 +452,11 @@ class _StepRow extends StatelessWidget {
   final bool isPrimary;
   final String text;
 
-  const _StepRow(
-      {required this.icon, required this.isPrimary, required this.text});
+  const _StepRow({
+    required this.icon,
+    required this.isPrimary,
+    required this.text,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -326,9 +481,10 @@ class _StepRow extends StatelessWidget {
             child: Text(
               text,
               style: TextStyle(
-                  fontFamily: kFontFamily,
-                  fontSize: 13,
-                  color: AppTheme.textMid),
+                fontFamily: kFontFamily,
+                fontSize: 13,
+                color: AppTheme.textMid,
+              ),
             ),
           ),
         ),

@@ -39,27 +39,46 @@ class ImportExportService {
     };
   }
 
+  static String _exportFilename() {
+    final now = DateTime.now();
+    final ts =
+        '${now.year}${_p(now.month)}${_p(now.day)}_${_p(now.hour)}${_p(now.minute)}${_p(now.second)}';
+    return 'bokses_export_$ts.json';
+  }
+
+  static String _p(int n) => n.toString().padLeft(2, '0');
+
   static Future<void> exportData({Rect? sharePositionOrigin}) async {
     final data = await buildExportPayload();
-
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-    final timestamp =
-        DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-    final filename = 'bokses_export_$timestamp.json';
+    final filename = _exportFilename();
 
     if (kIsWeb) {
       triggerWebDownload(jsonStr, filename);
-    } else {
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$filename');
-      await file.writeAsString(jsonStr);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Bokses Export',
-        text: 'My Bokses data export',
-        sharePositionOrigin: sharePositionOrigin,
-      );
+      return;
     }
+
+    // Try native save-to-filesystem dialog first (iOS Files, Android SAF, macOS/Win/Linux picker)
+    final bytes = Uint8List.fromList(utf8.encode(jsonStr));
+    final savedPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Bokses Export',
+      fileName: filename,
+      bytes: bytes,
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (savedPath != null) return;
+
+    // Fallback: write to temp dir and open share sheet
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(jsonStr);
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: filename,
+      sharePositionOrigin: sharePositionOrigin,
+    );
   }
 
   static Future<String> importData() async {

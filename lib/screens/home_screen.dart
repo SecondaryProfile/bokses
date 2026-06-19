@@ -442,43 +442,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               )
-            : Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.boksBlue, AppTheme.boksRed],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'B',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+            : ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: [AppTheme.boksBlue, AppTheme.boksRed],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ).createShader(bounds),
+                child: const Text(
+                  'Bokses',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 26,
+                    letterSpacing: -0.5,
+                    color: Colors.white,
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Bokses',
-                    style: TextStyle(
-                      fontFamily: kFontFamily,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 21,
-                      letterSpacing: -0.3,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                ],
+                ),
               ),
         actions: _searching
             ? [
@@ -624,16 +603,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
       floatingActionButton: _searching
           ? null
-          : FloatingActionButton.extended(
-              onPressed: _showAddBoxDialog,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New Box'),
-            )
+          : _GradientFab(onPressed: _showAddBoxDialog)
               .animate()
-              .scale(
-                  delay: 300.ms,
-                  duration: 400.ms,
-                  curve: Curves.elasticOut),
+              .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
     );
   }
 
@@ -835,6 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
           box: box,
           itemCount: count,
           index: i,
+          totalBoxes: boxes.length,
           onTap: () async {
             await Navigator.push(
               context,
@@ -1068,10 +1041,71 @@ class _StatChip extends StatelessWidget {
 
 // ── Box card ───────────────────────────────────────────────────────────────────
 
+// ── Gradient FAB ───────────────────────────────────────────────────────────────
+
+class _GradientFab extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _GradientFab({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.boksBlue, AppTheme.boksRed],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.boksBlue.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(30),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(30),
+          splashColor: Colors.white24,
+          highlightColor: Colors.white10,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'New Box',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Box card ───────────────────────────────────────────────────────────────────
+
 class _BoxCard extends StatelessWidget {
   final Box box;
   final int itemCount;
   final int index;
+  final int totalBoxes;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
@@ -1080,6 +1114,7 @@ class _BoxCard extends StatelessWidget {
     required this.box,
     required this.itemCount,
     required this.index,
+    required this.totalBoxes,
     required this.onTap,
     required this.onDelete,
     required this.onEdit,
@@ -1087,11 +1122,10 @@ class _BoxCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBlue = index.isEven;
-    final accentColor = isBlue ? AppTheme.boksBlue : AppTheme.boksRed;
-    final accentDim = isBlue ? AppTheme.boksBlueLight : AppTheme.boksRedLight;
-    final accentBright =
-        isBlue ? AppTheme.boksBlueBright : AppTheme.boksRedBright;
+    final t = totalBoxes > 1 ? index / (totalBoxes - 1) : 0.0;
+    final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+    final accentDim = Color.lerp(AppTheme.boksBlueLight, AppTheme.boksRedLight, t)!;
+    final accentBright = Color.lerp(AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
 
     return GestureDetector(
       onTap: onTap,

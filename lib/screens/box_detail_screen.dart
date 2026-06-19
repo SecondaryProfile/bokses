@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import '../models/box.dart';
 import '../models/item.dart';
@@ -37,11 +39,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     _load();
   }
 
-  /// Resolves a stored photo value (relative filename or legacy absolute path)
-  /// to a full file-system path usable by Image.file / ML Kit.
   String? _resolvePath(String? stored) {
     if (stored == null || stored.isEmpty) return null;
-    // Web data URIs and http URLs are already absolute — pass through.
     if (stored.startsWith('data:') ||
         stored.startsWith('http') ||
         stored.startsWith('blob:') ||
@@ -91,20 +90,20 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
         img = Image.network(path,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(
-                child:
-                    Icon(Icons.broken_image_rounded, color: AppTheme.textMid)));
+                child: Icon(Icons.broken_image_rounded,
+                    color: AppTheme.textMid)));
       } else if (path.startsWith('data:')) {
         img = Image.memory(base64Decode(path.split(',').last),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(
-                child:
-                    Icon(Icons.broken_image_rounded, color: AppTheme.textMid)));
+                child: Icon(Icons.broken_image_rounded,
+                    color: AppTheme.textMid)));
       } else {
         img = Image.file(File(path),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(
-                child:
-                    Icon(Icons.broken_image_rounded, color: AppTheme.textMid)));
+                child: Icon(Icons.broken_image_rounded,
+                    color: AppTheme.textMid)));
       }
       inner = Stack(
         fit: StackFit.expand,
@@ -116,8 +115,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
               right: 8,
               child: Container(
                 padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                    color: AppTheme.surface, shape: BoxShape.circle),
+                decoration:
+                    BoxDecoration(color: AppTheme.surface, shape: BoxShape.circle),
                 child: Icon(Icons.camera_alt_rounded,
                     size: 18, color: AppTheme.boksBlue),
               ),
@@ -128,8 +127,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       inner = Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.camera_alt_rounded,
-              color: AppTheme.boksBlue, size: 36),
+          Icon(Icons.camera_alt_rounded, color: AppTheme.boksBlue, size: 36),
           const SizedBox(height: 8),
           Text(
             editable ? 'Tap to take photo' : 'No photo',
@@ -149,8 +147,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
         decoration: BoxDecoration(
           color: AppTheme.boksBlueLight,
           borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: AppTheme.boksBlue.withValues(alpha: 0.3), width: 1.5),
+          border: Border.all(
+              color: AppTheme.boksBlue.withValues(alpha: 0.3), width: 1.5),
         ),
         child: inner,
       ),
@@ -159,7 +157,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
 
   Future<void> _showAddItemDialog() async {
     final cvEnabled = await SettingsService.getCvEnabled();
-
     final nameCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     String? photoPath;
@@ -180,7 +177,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: Form(
               key: formKey,
@@ -188,7 +186,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Drag handle
                   Center(
                     child: Container(
                       width: 40,
@@ -205,8 +202,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           fontSize: 24,
                           fontWeight: FontWeight.w800)),
                   const SizedBox(height: 20),
-
-                  // ── CV OFF: name field first (autofocus), then photo ──
                   if (!cvEnabled) ...[
                     TextFormField(
                       controller: nameCtrl,
@@ -228,8 +223,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                       },
                     ),
                   ],
-
-                  // ── CV ON: photo first, then AI suggestions, then name ──
                   if (cvEnabled) ...[
                     _buildPhotoWidget(
                       _resolvePath(photoPath),
@@ -241,7 +234,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           photoPath = path;
                           suggestions = null;
                         });
-
                         setModal(() => analyzing = true);
                         try {
                           final guesses = await VisionService.identifyItem(
@@ -262,8 +254,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                         }
                       },
                     ),
-
-                    // Analyzing indicator
                     if (analyzing) ...[
                       const SizedBox(height: 16),
                       Row(
@@ -273,8 +263,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                             width: 14,
                             height: 14,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppTheme.boksBlue),
+                                strokeWidth: 2, color: AppTheme.boksBlue),
                           ),
                           const SizedBox(width: 10),
                           Text('Identifying item…',
@@ -285,8 +274,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                         ],
                       ),
                     ],
-
-                    // Suggestion chips
                     if (suggestions != null && suggestions!.isNotEmpty) ...[
                       const SizedBox(height: 14),
                       Text('SUGGESTIONS — tap to use',
@@ -315,21 +302,18 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                                 border: Border.all(
                                     color: AppTheme.boksBlue, width: 1.5),
                               ),
-                              child: Text(
-                                guess,
-                                style: TextStyle(
-                                  fontFamily: kFontFamily,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.boksBlueBright,
-                                ),
-                              ),
+                              child: Text(guess,
+                                  style: TextStyle(
+                                    fontFamily: kFontFamily,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.boksBlueBright,
+                                  )),
                             ),
                           );
                         }).toList(),
                       ),
                     ],
-
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: nameCtrl,
@@ -341,8 +325,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           : null,
                     ),
                   ],
-
-                  // Remove photo button (both modes)
                   if (photoPath != null) ...[
                     const SizedBox(height: 8),
                     TextButton.icon(
@@ -359,7 +341,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                               fontWeight: FontWeight.w600)),
                     ),
                   ],
-
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -406,7 +387,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: Form(
               key: formKey,
@@ -432,7 +414,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   const SizedBox(height: 20),
                   TextFormField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Item name *'),
+                    decoration:
+                        const InputDecoration(labelText: 'Item name *'),
                     textCapitalization: TextCapitalization.sentences,
                     validator: (v) => (v == null || v.trim().isEmpty)
                         ? 'Name required'
@@ -498,7 +481,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
               child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.boksRed),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.boksRed),
             child: const Text('Delete'),
           ),
         ],
@@ -508,6 +492,25 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       await DatabaseService.instance.deleteItem(item.id);
       _load();
     }
+  }
+
+  Future<void> _startBoksTalk() async {
+    final silenceMs = await SettingsService.getTalkSilenceMs();
+    final readBack = await SettingsService.getTalkReadBack();
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BoksTalkSheet(
+        boxId: widget.box.id,
+        onItemAdded: _load,
+        silenceMs: silenceMs,
+        readBack: readBack,
+      ),
+    );
   }
 
   @override
@@ -521,12 +524,36 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
           : _items.isEmpty
               ? _emptyState()
               : _itemList(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddItemDialog,
-        backgroundColor: AppTheme.boksRed,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Item'),
-      ).animate().scale(delay: 200.ms, duration: 400.ms, curve: Curves.elasticOut),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'bokstalk',
+            onPressed: _startBoksTalk,
+            backgroundColor: AppTheme.boksBlue,
+            elevation: 2,
+            icon: const Icon(Icons.mic_rounded, size: 20),
+            label: const Text(
+              'BoksTalk',
+              style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'additem',
+            onPressed: _showAddItemDialog,
+            backgroundColor: AppTheme.boksRed,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Item'),
+          ),
+        ],
+      )
+          .animate()
+          .scale(delay: 200.ms, duration: 400.ms, curve: Curves.elasticOut),
     );
   }
 
@@ -542,8 +569,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
               color: AppTheme.boksRedLight,
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Icon(Icons.category_outlined,
-                size: 52, color: AppTheme.boksRed),
+            child:
+                Icon(Icons.category_outlined, size: 52, color: AppTheme.boksRed),
           ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
           const SizedBox(height: 28),
           const Text('Box is empty!',
@@ -569,7 +596,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
 
   Widget _itemList() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
       itemCount: _items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
@@ -589,6 +616,357 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     );
   }
 }
+
+// ── BoksTalk sheet ─────────────────────────────────────────────────────────────
+
+enum _TalkState { initializing, listening, heard, speaking, submitting, error }
+
+class BoksTalkSheet extends StatefulWidget {
+  final String boxId;
+  final Future<void> Function() onItemAdded;
+  final int silenceMs;
+  final bool readBack;
+
+  const BoksTalkSheet({
+    super.key,
+    required this.boxId,
+    required this.onItemAdded,
+    required this.silenceMs,
+    required this.readBack,
+  });
+
+  @override
+  State<BoksTalkSheet> createState() => _BoksTalkSheetState();
+}
+
+class _BoksTalkSheetState extends State<BoksTalkSheet> {
+  final _stt = SpeechToText();
+  final _tts = FlutterTts();
+
+  _TalkState _state = _TalkState.initializing;
+  String _words = '';
+  String _errorMsg = '';
+  int _addedCount = 0;
+  bool _processing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void dispose() {
+    _stt.cancel();
+    _tts.stop();
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    bool available = false;
+    try {
+      available = await _stt
+          .initialize(
+            onError: (e) {
+              if (mounted) {
+                setState(() {
+                  _state = _TalkState.error;
+                  _errorMsg = e.errorMsg;
+                });
+              }
+            },
+          )
+          .timeout(const Duration(seconds: 6), onTimeout: () => false);
+    } catch (_) {}
+
+    // TTS setup — awaitSpeakCompletion hangs on web, so skip it there
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.5);
+      if (!kIsWeb) await _tts.awaitSpeakCompletion(true);
+    } catch (_) {}
+
+    if (!mounted) return;
+    if (available) {
+      _startListening();
+    } else {
+      setState(() {
+        _state = _TalkState.error;
+        _errorMsg = kIsWeb
+            ? 'Speech recognition requires Chrome or Edge on web'
+            : 'Microphone not available';
+      });
+    }
+  }
+
+  Future<void> _startListening() async {
+    if (!mounted || _processing) return;
+    setState(() {
+      _words = '';
+      _state = _TalkState.listening;
+    });
+
+    try {
+      await _stt.listen(
+        onResult: (result) {
+          if (!mounted || _processing) return;
+          setState(() => _words = result.recognizedWords);
+          if (result.finalResult) {
+            _processing = true;
+            _handleFinal(_words.trim());
+          }
+        },
+        listenOptions: SpeechListenOptions(
+          pauseFor: Duration(milliseconds: widget.silenceMs),
+          listenFor: const Duration(seconds: 60),
+          partialResults: true,
+          cancelOnError: true,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _state = _TalkState.error;
+          _errorMsg = e.toString();
+        });
+      }
+    }
+  }
+
+  void _handleFinal(String text) {
+    if (!mounted) return;
+    if (text.isEmpty) {
+      _processing = false;
+      _startListening();
+      return;
+    }
+    Future.microtask(() => _submitItem(text));
+  }
+
+  Future<void> _submitItem(String text) async {
+    if (!mounted) return;
+
+    if (widget.readBack) {
+      setState(() => _state = _TalkState.speaking);
+      try {
+        await _tts.speak(text).timeout(const Duration(seconds: 8));
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() => _state = _TalkState.submitting);
+
+    try {
+      final item = Item(
+        id: const Uuid().v4(),
+        name: text,
+        boxId: widget.boxId,
+        createdAt: DateTime.now(),
+      );
+      await DatabaseService.instance.insertItem(item);
+      await widget.onItemAdded();
+      if (mounted) setState(() => _addedCount++);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not add item: $e')));
+      }
+    }
+
+    _processing = false;
+    if (mounted) {
+      await Future.delayed(const Duration(milliseconds: 350));
+      _startListening();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppTheme.bubblePurple,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Header row
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppTheme.boksBlueLight,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child:
+                    Icon(Icons.mic_rounded, color: AppTheme.boksBlue, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'BoksTalk',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+              ),
+              if (_addedCount > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.boksBlueLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$_addedCount added',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.boksBlueBright,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Status indicator
+          _buildStatus(),
+
+          // Heard words
+          if (_words.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.boksBlueLight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: AppTheme.boksBlue.withValues(alpha: 0.3), width: 1.5),
+              ),
+              child: Text(
+                '"$_words"',
+                style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.boksBlueBright,
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 28),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.stop_rounded),
+              label: const Text('Stop Session'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.textMid,
+                side: BorderSide(color: AppTheme.bubblePurple, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatus() {
+    final (IconData icon, String label, Color color, bool pulse) =
+        switch (_state) {
+      _TalkState.initializing => (
+          Icons.hourglass_top_rounded,
+          'Starting…',
+          AppTheme.textMid,
+          false,
+        ),
+      _TalkState.listening => (
+          Icons.mic_rounded,
+          'Listening…',
+          AppTheme.boksBlue,
+          true,
+        ),
+      _TalkState.heard => (
+          Icons.check_circle_rounded,
+          'Got it!',
+          AppTheme.boksBlue,
+          false,
+        ),
+      _TalkState.speaking => (
+          Icons.volume_up_rounded,
+          'Reading back…',
+          AppTheme.boksRed,
+          true,
+        ),
+      _TalkState.submitting => (
+          Icons.playlist_add_rounded,
+          'Adding item…',
+          AppTheme.boksRed,
+          false,
+        ),
+      _TalkState.error => (
+          Icons.error_outline_rounded,
+          _errorMsg.isNotEmpty ? _errorMsg : 'Microphone unavailable',
+          AppTheme.boksRed,
+          false,
+        ),
+    };
+
+    Widget iconWidget = Icon(icon, size: 36, color: color);
+    if (pulse) {
+      iconWidget = iconWidget
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .scaleXY(end: 1.18, duration: 700.ms, curve: Curves.easeInOut)
+          .fadeIn(begin: 0.6, duration: 700.ms);
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        iconWidget,
+        const SizedBox(width: 14),
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: kFontFamily,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Item card ──────────────────────────────────────────────────────────────────
 
 class _ItemCard extends StatefulWidget {
   final Item item;
@@ -629,10 +1007,13 @@ class _ItemCardState extends State<_ItemCard> {
               padding: const EdgeInsets.all(24),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: kIsWeb || path.startsWith('http') || path.startsWith('blob:')
+                child: kIsWeb ||
+                        path.startsWith('http') ||
+                        path.startsWith('blob:')
                     ? Image.network(path, fit: BoxFit.contain)
                     : path.startsWith('data:')
-                        ? Image.memory(base64Decode(path.split(',').last), fit: BoxFit.contain)
+                        ? Image.memory(base64Decode(path.split(',').last),
+                            fit: BoxFit.contain)
                         : Image.file(File(path), fit: BoxFit.contain),
               ),
             ),
@@ -667,7 +1048,6 @@ class _ItemCardState extends State<_ItemCard> {
       ),
       child: Row(
         children: [
-          // Photo thumbnail
           GestureDetector(
             onLongPressStart: (_) => _showPhotoOverlay(),
             onLongPressEnd: (_) => _removeOverlay(),
@@ -679,7 +1059,8 @@ class _ItemCardState extends State<_ItemCard> {
                 width: 90,
                 height: 90,
                 child: hasPhoto
-                    ? widget.buildPhotoWidget(widget.resolvedPhotoPath, height: 90)
+                    ? widget.buildPhotoWidget(widget.resolvedPhotoPath,
+                        height: 90)
                     : Container(
                         color: AppTheme.cardBg,
                         child: Icon(Icons.image_not_supported_outlined,
@@ -718,8 +1099,9 @@ class _ItemCardState extends State<_ItemCard> {
                       style: TextStyle(
                           fontFamily: kFontFamily,
                           fontSize: 12,
-                          color:
-                              hasPhoto ? AppTheme.boksBlue : AppTheme.textMid),
+                          color: hasPhoto
+                              ? AppTheme.boksBlue
+                              : AppTheme.textMid),
                     ),
                   ],
                 ),

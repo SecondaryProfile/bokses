@@ -1,7 +1,18 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.1.1';
+const String kAppVersion = '0.1.2';
 
 const kChangelog = [
+  (
+    version: '0.1.2',
+    date: '2026-06-19',
+    changes: [
+      'BoksTalk — voice-to-item mode; speak an item name and it auto-adds after silence',
+      'BoksTalk settings — adjustable silence timeout and optional read-back',
+      'Gradient UI — title, box cards, and New Box button all blend between theme colors',
+      'App icon updated on iOS and Android; Android splash screen shows Bokses icon',
+      'Export saves directly to the file system with a timestamped filename',
+    ],
+  ),
   (
     version: '0.1.1',
     date: '2026-06-18',
