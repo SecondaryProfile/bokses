@@ -27,6 +27,8 @@ class AppTheme {
 
   static final ValueNotifier<bool> modeNotifier = ValueNotifier(true);
   static final ValueNotifier<int> presetNotifier = ValueNotifier(0);
+  static final ValueNotifier<int> bgNotifier = ValueNotifier(0);
+  static void notifyBgChanged() => bgNotifier.value++;
 
   static void setMode(bool dark) {
     _isDark = dark;
@@ -214,6 +216,7 @@ class AppTheme {
           color: txtDark,
           fontWeight: FontWeight.w600,
         ),
+        actionTextColor: bright,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         behavior: SnackBarBehavior.floating,
       ),

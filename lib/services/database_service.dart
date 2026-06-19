@@ -117,6 +117,17 @@ class DatabaseService {
     return results;
   }
 
+  Future<Map<String, Set<ItemLabel>>> getAllBoxItemLabels() async {
+    final items = await _readItems();
+    final result = <String, Set<ItemLabel>>{};
+    for (final item in items) {
+      if (item.labels.isNotEmpty) {
+        result.putIfAbsent(item.boxId, () => <ItemLabel>{}).addAll(item.labels);
+      }
+    }
+    return result;
+  }
+
   Future<void> clearAll() async {
     final p = await _prefs();
     await p.remove(_boxesKey);

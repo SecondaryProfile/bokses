@@ -1,5 +1,41 @@
 # Bokses — Changelog
 
+## 0.1.3 — 2026-06-19
+
+### Added
+- List view for the home screen — toggle between grid and list with the button in the summary bar
+- iOS-style swipe actions on box list rows and item rows: short swipe reveals Edit / Delete; full swipe deletes immediately with an undo toast
+- Item labels — Fragile (yellow/black stripes), Battery (black→red gradient), Liquid (blue polkadots) — added via a Labels button in the add/edit item sheet
+- Box cards and list tiles show any labels present on their items
+- Instant Load setting (Performance → Settings) — skips fade-in animations so content appears immediately; on by default
+- Animated splash screen — white background, app icon scales in with a bounce animation before fading into the home screen; Android native splash colour updated to white
+- Import progress dialog — blocking modal with a progress bar while data imports, preventing interaction until complete
+- Box descriptions shown below the name in list view and as a subtitle under the app bar in the per-box detail view
+- **AutoBoks** replaces BoksTalk — hands-free voice-to-item mode now with automatic photo capture: say an item name, a ding fires after the silence window, the back camera captures a photo automatically, and the item is added with that photo attached
+- AutoBoks live camera preview shown in the sheet so you can frame the item before speaking
+- Camera toggle in AutoBoks settings — off reverts to pure voice-to-name mode (no ding, no capture)
+- AutoBoks intro dialog updated to explain the camera flow; mic-only variant shown when camera is disabled
+- **Background** setting — choose between Default, Gradient (theme colours top-left → bottom-right), Photo (pick from library, with blur slider), or Solid (12 preset colour swatches); background applies full-bleed behind the home screen
+- **Move to Box** — three-dot menu on any item now includes "Move to Box"; tapping opens a sheet listing all other boxes with their item counts; one tap moves the item and shows a confirmation toast
+- New Box button outline — thin white border on the gradient FAB so it reads clearly against any background
+
+### Changed
+- Settings screen redesigned with iOS-style grouped cards and consistent icon-badge rows; sections reordered to General → Background → AutoBoks → Performance → Computer Vision
+- App bar "Bokses" title enlarged (26 → 30 pt); action button icons and padding increased
+- Delete All Data and per-item Delete are always red regardless of active colour theme
+- Box deletion via popup menu and swipe-reveal Delete button now uses the same instant-delete + undo-toast pattern as full-swipe; confirmation dialog removed for consistency
+- New Box FAB has a white outline so it reads clearly against custom backgrounds
+- Android `compileSdk` set explicitly to 36 (required by CameraX 1.5 and current AndroidX libraries)
+
+### Fixed
+- Undo toast after swipe-delete no longer stacks indefinitely when items are deleted in quick succession
+- Import progress dialog reliably appears for all import sizes (race condition caused it to pop before rendering for small files)
+- List view accent stripe now clipped to the card's rounded corners (`clipBehavior: Clip.antiAlias`)
+- AutoBoks camera permission now requested while `BoxDetailScreen` is fully visible, before the sheet opens — fixes silent failure on Android where the system dialog could not interrupt a bottom-sheet animation
+- Camera init errors surface the actual error message instead of a generic "Camera unavailable"
+
+---
+
 ## 0.1.2 — 2026-06-19
 
 ### Added

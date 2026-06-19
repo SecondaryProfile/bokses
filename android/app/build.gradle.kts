@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.bokses"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36  // camera_android_camerax + AndroidX require compileSdk 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

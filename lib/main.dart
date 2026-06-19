@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +43,7 @@ class _BoksesAppState extends State<BoksesApp> {
       title: 'Bokses',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }

@@ -3,6 +3,19 @@ const String kAppVersion = '0.1.2';
 
 const kChangelog = [
   (
+    version: '0.1.3',
+    date: 'Unreleased',
+    changes: [
+      'List view for boxes with iOS-style swipe actions (rename / delete)',
+      'Swipe actions on items inside a box',
+      'Item labels — Fragile, Battery, Liquid — shown on items and propagated to box cards',
+      'Instant Load setting skips animations for faster scrolling',
+      'Box cards now display the box name at top instead of an icon',
+      'Bigger search and menu controls in the app bar',
+      'Version footer moved to Settings',
+    ],
+  ),
+  (
     version: '0.1.2',
     date: '2026-06-19',
     changes: [

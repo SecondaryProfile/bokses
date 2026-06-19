@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
+import 'version_history_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,11 +15,26 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _cvEnabled = false;
+  // Appearance
   bool _isDark = true;
   int _presetIndex = 0;
+
+  // Background
+  AppBgType _bgType = AppBgType.none;
+  Uint8List? _bgImage;
+  double _bgBlur = 10.0;
+  int _bgColor = 0xFF0C0C0E;
+
+  // AutoBoks
   int _talkSilenceMs = SettingsService.defaultTalkSilenceMs;
   bool _talkReadBack = false;
+  bool _autoBoksCamera = true;
+
+  // Computer Vision
+  bool _cvEnabled = false;
+
+  // Performance
+  bool _loadAll = true;
 
   @override
   void initState() {
@@ -24,400 +43,537 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final cv = await SettingsService.getCvEnabled();
     final dark = await SettingsService.getIsDarkMode();
     final preset = await SettingsService.getThemePreset();
+    final bgType = await SettingsService.getBackgroundType();
+    final bgImageStr = await SettingsService.getBackgroundImage();
+    final bgBlur = await SettingsService.getBackgroundBlur();
+    final bgColor = await SettingsService.getBackgroundColor();
     final silenceMs = await SettingsService.getTalkSilenceMs();
     final readBack = await SettingsService.getTalkReadBack();
+    final autoBoksCamera = await SettingsService.getAutoBoksCameraEnabled();
+    final cv = await SettingsService.getCvEnabled();
+    final loadAll = await SettingsService.getLoadAllContent();
     if (!mounted) return;
+
+    Uint8List? bgImage;
+    if (bgImageStr != null && bgImageStr.startsWith('data:')) {
+      try {
+        bgImage = base64Decode(bgImageStr.split(',').last);
+      } catch (_) {}
+    }
+
     setState(() {
-      _cvEnabled = cv;
       _isDark = dark;
       _presetIndex = preset;
+      _bgType = bgType;
+      _bgImage = bgImage;
+      _bgBlur = bgBlur;
+      _bgColor = bgColor;
       _talkSilenceMs = silenceMs;
       _talkReadBack = readBack;
+      _autoBoksCamera = autoBoksCamera;
+      _cvEnabled = cv;
+      _loadAll = loadAll;
     });
   }
+
+  Future<void> _setBgType(AppBgType type) async {
+    await SettingsService.setBackgroundType(type);
+    AppTheme.notifyBgChanged();
+    setState(() => _bgType = type);
+  }
+
+  Future<void> _pickBgImage() async {
+    final picker = ImagePicker();
+    final xfile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1080,
+      maxHeight: 1920,
+      imageQuality: 70,
+    );
+    if (xfile == null) return;
+    final bytes = await xfile.readAsBytes();
+    final dataUri = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    await SettingsService.setBackgroundImage(dataUri);
+    AppTheme.notifyBgChanged();
+    if (mounted) setState(() => _bgImage = bytes);
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
         children: [
-          _sectionHeader('APPEARANCE'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.boksBlueLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.dark_mode_rounded,
-                    color: AppTheme.boksBlue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Dark Mode',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Toggle between dark and light theme',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 12,
-                          color: AppTheme.textMid,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _isDark,
-                  activeThumbColor: AppTheme.boksBlue,
-                  activeTrackColor: AppTheme.boksBlueLight,
-                  onChanged: (v) async {
-                    AppTheme.setMode(v);
-                    await SettingsService.setIsDarkMode(v);
-                    setState(() => _isDark = v);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _sectionHeader('THEME'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 16,
-            children: List.generate(AppTheme.presets.length, (i) {
-              final preset = AppTheme.presets[i];
-              final selected = _presetIndex == i;
-              return GestureDetector(
-                onTap: () async {
-                  AppTheme.setPreset(i);
-                  await SettingsService.setThemePreset(i);
-                  setState(() => _presetIndex = i);
+          // ── GENERAL ────────────────────────────────────────────────────────────
+          _sectionLabel('GENERAL'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.dark_mode_rounded,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Dark Mode',
+              trailing: Switch(
+                value: _isDark,
+                activeThumbColor: AppTheme.boksBlue,
+                activeTrackColor: AppTheme.boksBlueLight,
+                onChanged: (v) async {
+                  AppTheme.setMode(v);
+                  await SettingsService.setIsDarkMode(v);
+                  setState(() => _isDark = v);
                 },
-                child: SizedBox(
-                  width: 72,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: selected
-                                ? AppTheme.boksBlue
-                                : AppTheme.bubblePurple,
-                            width: selected ? 3 : 1.5,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Row(
-                            children: [
-                              Expanded(child: Container(color: preset.primary)),
-                              Expanded(child: Container(color: preset.accent)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        preset.name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 11,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selected
-                              ? AppTheme.boksBlueBright
-                              : AppTheme.textMid,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 24),
-          _sectionHeader('COMPUTER VISION'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+              ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.boksBlueLight,
-                    borderRadius: BorderRadius.circular(12),
+          ]),
+          const SizedBox(height: 8),
+          _settingsGroup([
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Colour Theme',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textMid,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    color: AppTheme.boksBlue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Computer Vision',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Identify items from photos using on-device AI',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 12,
-                          color: AppTheme.textMid,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _cvEnabled,
-                  activeThumbColor: AppTheme.boksBlue,
-                  activeTrackColor: AppTheme.boksBlueLight,
-                  onChanged: (v) async {
-                    if (v) {
-                      await showDialog<void>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text(
-                            'Experimental Feature',
-                            style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontWeight: FontWeight.w800,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 14,
+                    children: List.generate(AppTheme.presets.length, (i) {
+                      final preset = AppTheme.presets[i];
+                      final selected = _presetIndex == i;
+                      return GestureDetector(
+                        onTap: () async {
+                          AppTheme.setPreset(i);
+                          await SettingsService.setThemePreset(i);
+                          setState(() => _presetIndex = i);
+                        },
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: selected
+                                      ? AppTheme.boksBlue
+                                      : AppTheme.bubblePurple,
+                                  width: selected ? 2.5 : 1.5,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(11),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                        child: Container(color: preset.primary)),
+                                    Expanded(
+                                        child: Container(color: preset.accent)),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                          content: const Text(
-                            'Computer vision is experimental. The current models are not very accurate — results are expected to improve over time.',
-                            style: TextStyle(fontFamily: kFontFamily),
-                          ),
-                          actions: [
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Got it'),
+                            const SizedBox(height: 5),
+                            Text(
+                              preset.name,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: kFontFamily,
+                                fontSize: 10,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? AppTheme.boksBlueBright
+                                    : AppTheme.textMid,
+                              ),
                             ),
                           ],
                         ),
                       );
-                    }
-                    await SettingsService.setCvEnabled(v);
-                    setState(() => _cvEnabled = v);
-                  },
-                ),
-              ],
-            ),
-          ),
-          if (_cvEnabled) ...[
-            const SizedBox(height: 20),
-            _sectionHeader('HOW IT WORKS'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
-              ),
-              child: const Column(
-                children: [
-                  _StepRow(
-                    icon: Icons.camera_alt_rounded,
-                    isPrimary: true,
-                    text: 'Take a photo of your item',
-                  ),
-                  SizedBox(height: 12),
-                  _StepRow(
-                    icon: Icons.auto_awesome_rounded,
-                    isPrimary: false,
-                    text: 'On-device AI analyzes the image instantly',
-                  ),
-                  SizedBox(height: 12),
-                  _StepRow(
-                    icon: Icons.checklist_rounded,
-                    isPrimary: true,
-                    text: 'Pick from 5 guesses or type the name yourself',
+                    }),
                   ),
                 ],
               ),
             ),
-          ],
-          const SizedBox(height: 24),
-          _sectionHeader('BOKSTALK'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          ]),
+          const SizedBox(height: 28),
+
+          // ── BACKGROUND ─────────────────────────────────────────────────────────
+          _sectionLabel('BACKGROUND'),
+          _settingsGroup([
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: _bgTypeRow(),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.boksBlueLight,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.timer_rounded,
-                        color: AppTheme.boksBlue,
-                        size: 20,
+            if (_bgType == AppBgType.gradient) ...[
+              _groupDivider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.boksBlue, AppTheme.boksRed],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    child: Center(
+                      child: Text(
+                        'Theme gradient preview',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (_bgType == AppBgType.image) ...[
+              _groupDivider(),
+              _settingsTile(
+                icon: Icons.photo_library_rounded,
+                iconColor: AppTheme.boksBlue,
+                iconBg: AppTheme.boksBlueLight,
+                title: _bgImage != null ? 'Change Photo' : 'Choose Photo',
+                subtitle: _bgImage != null
+                    ? 'Tap to replace'
+                    : 'Pick from your library',
+                trailing: _bgImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(_bgImage!,
+                            width: 44, height: 44, fit: BoxFit.cover),
+                      )
+                    : Icon(Icons.chevron_right_rounded,
+                        color: AppTheme.textMid),
+                onTap: _pickBgImage,
+              ),
+              _groupDivider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppTheme.boksBlueLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.blur_on_rounded,
+                          color: AppTheme.boksBlue, size: 18),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Silence Timeout',
+                        'Blur',
                         style: TextStyle(
                           fontFamily: kFontFamily,
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: AppTheme.textDark,
                         ),
                       ),
                     ),
                     Text(
-                      '${(_talkSilenceMs / 1000).toStringAsFixed(1)}s',
+                      _bgBlur < 1 ? 'Off' : '${_bgBlur.round()}',
                       style: TextStyle(
                         fontFamily: kFontFamily,
                         fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: AppTheme.boksBlueBright,
                       ),
                     ),
                   ],
                 ),
-                Slider(
-                  value: _talkSilenceMs.toDouble(),
-                  min: 500,
-                  max: 5000,
-                  divisions: 9,
-                  activeColor: AppTheme.boksBlue,
-                  inactiveColor: AppTheme.boksBlueLight,
-                  onChanged: (v) => setState(() => _talkSilenceMs = v.round()),
-                  onChangeEnd: (v) =>
-                      SettingsService.setTalkSilenceMs(v.round()),
-                ),
-                Text(
-                  'Stop listening after this long with no speech',
-                  style: TextStyle(
-                    fontFamily: kFontFamily,
-                    fontSize: 12,
-                    color: AppTheme.textMid,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Divider(color: AppTheme.bubblePurple),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.boksRedLight,
-                        borderRadius: BorderRadius.circular(12),
+              ),
+              Slider(
+                value: _bgBlur,
+                min: 0,
+                max: 30,
+                divisions: 30,
+                activeColor: AppTheme.boksBlue,
+                inactiveColor: AppTheme.boksBlueLight,
+                onChanged: (v) => setState(() => _bgBlur = v),
+                onChangeEnd: (v) async {
+                  await SettingsService.setBackgroundBlur(v);
+                  AppTheme.notifyBgChanged();
+                },
+              ),
+              const SizedBox(height: 4),
+            ],
+            if (_bgType == AppBgType.solid) ...[
+              _groupDivider(),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _bgPresetColors.map((c) {
+                    final selected = _bgColor == c;
+                    return GestureDetector(
+                      onTap: () async {
+                        await SettingsService.setBackgroundColor(c);
+                        AppTheme.notifyBgChanged();
+                        setState(() => _bgColor = c);
+                      },
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Color(c),
+                          borderRadius: BorderRadius.circular(11),
+                          border: selected
+                              ? Border.all(color: AppTheme.boksBlue, width: 2.5)
+                              : Border.all(
+                                  color: AppTheme.bubblePurple, width: 1),
+                        ),
+                        child: selected
+                            ? Icon(Icons.check_rounded,
+                                color: c == 0xFFFFFFFF
+                                    ? Colors.black54
+                                    : Colors.white,
+                                size: 18)
+                            : null,
                       ),
-                      child: Icon(
-                        Icons.volume_up_rounded,
-                        color: AppTheme.boksRed,
-                        size: 20,
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ]),
+          const SizedBox(height: 28),
+
+          // ── AUTOBOKS ───────────────────────────────────────────────────────────
+          _sectionLabel('AUTOBOKS'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.camera_rounded,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Camera',
+              subtitle: 'Auto-capture a photo when an item is recorded',
+              trailing: Switch(
+                value: _autoBoksCamera,
+                activeThumbColor: AppTheme.boksBlue,
+                activeTrackColor: AppTheme.boksBlueLight,
+                onChanged: (v) async {
+                  await SettingsService.setAutoBoksCameraEnabled(v);
+                  setState(() => _autoBoksCamera = v);
+                },
+              ),
+            ),
+            _groupDivider(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppTheme.boksBlueLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.timer_rounded,
+                        color: AppTheme.boksBlue, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Silence Timeout',
+                      style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Read Back',
-                            style: TextStyle(
+                  ),
+                  Text(
+                    '${(_talkSilenceMs / 1000).toStringAsFixed(1)}s',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.boksBlueBright,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Slider(
+              value: _talkSilenceMs.toDouble(),
+              min: 500,
+              max: 5000,
+              divisions: 9,
+              activeColor: AppTheme.boksBlue,
+              inactiveColor: AppTheme.boksBlueLight,
+              onChanged: (v) => setState(() => _talkSilenceMs = v.round()),
+              onChangeEnd: (v) => SettingsService.setTalkSilenceMs(v.round()),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                'Stop listening after this long with no speech',
+                style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 12,
+                  color: AppTheme.textMid,
+                ),
+              ),
+            ),
+            _groupDivider(),
+            _settingsTile(
+              icon: Icons.volume_up_rounded,
+              iconColor: AppTheme.boksRed,
+              iconBg: AppTheme.boksRedLight,
+              title: 'Read Back',
+              subtitle: 'Speak the heard name aloud before adding',
+              trailing: Switch(
+                value: _talkReadBack,
+                activeThumbColor: AppTheme.boksRed,
+                activeTrackColor: AppTheme.boksRedLight,
+                onChanged: (v) async {
+                  await SettingsService.setTalkReadBack(v);
+                  setState(() => _talkReadBack = v);
+                },
+              ),
+            ),
+          ]),
+          const SizedBox(height: 28),
+
+          // ── PERFORMANCE ────────────────────────────────────────────────────────
+          _sectionLabel('PERFORMANCE'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.bolt_rounded,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Instant Load',
+              subtitle:
+                  'Skip fade-in animations so boxes and items appear immediately',
+              trailing: Switch(
+                value: _loadAll,
+                activeThumbColor: AppTheme.boksBlue,
+                activeTrackColor: AppTheme.boksBlueLight,
+                onChanged: (v) async {
+                  await SettingsService.setLoadAllContent(v);
+                  setState(() => _loadAll = v);
+                },
+              ),
+            ),
+          ]),
+          const SizedBox(height: 28),
+
+          // ── COMPUTER VISION ────────────────────────────────────────────────────
+          _sectionLabel('COMPUTER VISION'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.auto_awesome_rounded,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Computer Vision',
+              subtitle: 'Identify items from photos using on-device AI',
+              trailing: Switch(
+                value: _cvEnabled,
+                activeThumbColor: AppTheme.boksBlue,
+                activeTrackColor: AppTheme.boksBlueLight,
+                onChanged: (v) async {
+                  if (v) {
+                    await showDialog<void>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text(
+                          'Experimental Feature',
+                          style: TextStyle(
                               fontFamily: kFontFamily,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textDark,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Speak the heard words aloud before adding',
-                            style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 12,
-                              color: AppTheme.textMid,
-                            ),
+                              fontWeight: FontWeight.w800),
+                        ),
+                        content: const Text(
+                          'Computer vision is experimental. The current models '
+                          'are not very accurate — results are expected to improve '
+                          'over time.',
+                          style: TextStyle(fontFamily: kFontFamily),
+                        ),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Got it'),
                           ),
                         ],
                       ),
+                    );
+                  }
+                  await SettingsService.setCvEnabled(v);
+                  setState(() => _cvEnabled = v);
+                },
+              ),
+            ),
+            if (_cvEnabled) ...[
+              _groupDivider(),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _StepRow(
+                      icon: Icons.camera_alt_rounded,
+                      isPrimary: true,
+                      text: 'Take a photo of your item',
                     ),
-                    Switch(
-                      value: _talkReadBack,
-                      activeThumbColor: AppTheme.boksRed,
-                      activeTrackColor: AppTheme.boksRedLight,
-                      onChanged: (v) async {
-                        await SettingsService.setTalkReadBack(v);
-                        setState(() => _talkReadBack = v);
-                      },
+                    const SizedBox(height: 10),
+                    _StepRow(
+                      icon: Icons.auto_awesome_rounded,
+                      isPrimary: false,
+                      text: 'On-device AI analyses the image instantly',
+                    ),
+                    const SizedBox(height: 10),
+                    _StepRow(
+                      icon: Icons.checklist_rounded,
+                      isPrimary: true,
+                      text: 'Pick from 5 guesses or type the name yourself',
                     ),
                   ],
                 ),
-              ],
+              ),
+            ],
+          ]),
+          const SizedBox(height: 40),
+
+          // ── VERSION ────────────────────────────────────────────────────────────
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VersionHistoryScreen()),
+            ),
+            child: Center(
+              child: Text(
+                'v$kAppVersion',
+                style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 12,
+                  color: AppTheme.textMid.withValues(alpha: 0.6),
+                ),
+              ),
             ),
           ),
         ],
@@ -425,27 +581,167 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _sectionHeader(String title) {
-    return Container(
-      padding: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppTheme.bubblePurple, width: 1),
-        ),
-      ),
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  Widget _sectionLabel(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Text(
         title,
         style: TextStyle(
           fontFamily: kFontFamily,
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
+          letterSpacing: 0.8,
           color: AppTheme.boksBlueBright,
         ),
       ),
     );
   }
+
+  Widget _settingsGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _groupDivider() => Divider(
+        height: 1,
+        thickness: 1,
+        color: AppTheme.bubblePurple.withValues(alpha: 0.6),
+        indent: 64,
+      );
+
+  Widget _settingsTile({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontSize: 12,
+                        color: AppTheme.textMid,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bgTypeRow() {
+    const types = [
+      (AppBgType.none, Icons.format_paint_outlined, 'Default'),
+      (AppBgType.gradient, Icons.gradient_rounded, 'Gradient'),
+      (AppBgType.image, Icons.image_rounded, 'Photo'),
+      (AppBgType.solid, Icons.circle, 'Solid'),
+    ];
+    return Row(
+      children: types.map((t) {
+        final selected = _bgType == t.$1;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => _setBgType(t.$1),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: selected ? AppTheme.boksBlueLight : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: selected
+                    ? Border.all(color: AppTheme.boksBlue, width: 1.5)
+                    : null,
+              ),
+              child: Column(
+                children: [
+                  Icon(t.$2,
+                      size: 20,
+                      color: selected
+                          ? AppTheme.boksBlueBright
+                          : AppTheme.textMid),
+                  const SizedBox(height: 4),
+                  Text(
+                    t.$3,
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 11,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? AppTheme.boksBlueBright
+                          : AppTheme.textMid,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  static const _bgPresetColors = [
+    // Dark
+    0xFF0C0C0E, 0xFF1A1A2E, 0xFF0F3460, 0xFF2D1B69,
+    0xFF1B4332, 0xFF3B1313, 0xFF2C3E50, 0xFF4A0E0E,
+    // Light
+    0xFFFFFFFF, 0xFFF5F5F7, 0xFFE8E8EC, 0xFFD4D4D8,
+  ];
 }
+
+// ── Step row (used in Computer Vision explanation) ─────────────────────────────
 
 class _StepRow extends StatelessWidget {
   final IconData icon;

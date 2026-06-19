@@ -58,7 +58,6 @@ class ImportExportService {
       return;
     }
 
-    // Try native save-to-filesystem dialog first (iOS Files, Android SAF, macOS/Win/Linux picker)
     final bytes = Uint8List.fromList(utf8.encode(jsonStr));
     final savedPath = await FilePicker.platform.saveFile(
       dialogTitle: 'Save Bokses Export',
@@ -70,7 +69,6 @@ class ImportExportService {
 
     if (savedPath != null) return;
 
-    // Fallback: write to temp dir and open share sheet
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsString(jsonStr);
@@ -81,30 +79,37 @@ class ImportExportService {
     );
   }
 
-  static Future<String> importData() async {
+  // Step 1 — pick a file and return its contents as a JSON string.
+  // Returns null if the user cancels or the file can't be read.
+  static Future<String?> pickImportJson() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
       withData: true,
     );
-
-    if (result == null || result.files.isEmpty) return 'Import cancelled.';
+    if (result == null || result.files.isEmpty) return null;
 
     final fileBytes = result.files.first.bytes;
-    String jsonStr;
-
-    if (fileBytes != null) {
-      jsonStr = utf8.decode(fileBytes);
-    } else if (!kIsWeb && result.files.first.path != null) {
-      jsonStr = await File(result.files.first.path!).readAsString();
-    } else {
-      return 'Could not read file.';
+    if (fileBytes != null) return utf8.decode(fileBytes);
+    if (!kIsWeb && result.files.first.path != null) {
+      return await File(result.files.first.path!).readAsString();
     }
+    return null;
+  }
 
+  // Legacy single-call API kept for compatibility.
+  static Future<String> importData() async {
+    final jsonStr = await pickImportJson();
+    if (jsonStr == null) return 'Import cancelled.';
     return processImportJson(jsonStr);
   }
 
-  static Future<String> processImportJson(String jsonStr) async {
+  // Step 2 — parse and insert.  onProgress(done, total) is called after every
+  // inserted record so callers can drive a progress indicator.
+  static Future<String> processImportJson(
+    String jsonStr, {
+    void Function(int done, int total)? onProgress,
+  }) async {
     if (!jsonStr.trimLeft().startsWith('{')) {
       return 'Invalid file — expected a Bokses JSON export.';
     }
@@ -113,6 +118,8 @@ class ImportExportService {
 
     final List boxMaps = data['boxes'] ?? [];
     final List itemMaps = data['items'] ?? [];
+    final total = boxMaps.length + itemMaps.length;
+    int done = 0;
     int boxCount = 0;
     int itemCount = 0;
 
@@ -120,6 +127,8 @@ class ImportExportService {
       await DatabaseService.instance
           .insertBox(Box.fromMap(Map<String, dynamic>.from(bMap)));
       boxCount++;
+      done++;
+      onProgress?.call(done, total);
     }
     for (final iMap in itemMaps) {
       final map = Map<String, dynamic>.from(iMap);
@@ -128,6 +137,8 @@ class ImportExportService {
           photoData != null ? 'data:image/jpeg;base64,$photoData' : null;
       await DatabaseService.instance.insertItem(Item.fromMap(map));
       itemCount++;
+      done++;
+      onProgress?.call(done, total);
     }
     return 'Imported $boxCount box(es) and $itemCount item(s).';
   }
