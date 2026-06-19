@@ -76,14 +76,14 @@ class _SearchScreenState extends State<SearchScreen> {
             fontWeight: FontWeight.w600,
             color: AppTheme.textDark,
           ),
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: 'Search items…',
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             fillColor: Colors.transparent,
             filled: false,
-            contentPadding: const EdgeInsets.all(0),
+            contentPadding: EdgeInsets.zero,
           ),
         ),
         actions: [

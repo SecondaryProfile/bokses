@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../models/box.dart';
 import '../models/item.dart';
@@ -8,7 +9,10 @@ class DatabaseService {
   DatabaseService._internal();
   DatabaseService.forTesting(); // subclasses use this
 
-  Uri _api(String path) => Uri.base.resolve(path);
+  static String serverUrl = 'http://localhost:8743';
+
+  Uri _api(String path) =>
+      kIsWeb ? Uri.base.resolve(path) : Uri.parse('$serverUrl$path');
 
   static const _json = {'Content-Type': 'application/json'};
 

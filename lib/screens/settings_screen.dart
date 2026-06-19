@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../services/database_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
@@ -14,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _cvEnabled = false;
   bool _isDark = true;
   int _presetIndex = 0;
+  final _serverUrlCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -21,16 +24,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _serverUrlCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final cv = await SettingsService.getCvEnabled();
     final dark = await SettingsService.getIsDarkMode();
     final preset = await SettingsService.getThemePreset();
+    final url = await SettingsService.getServerUrl();
     if (!mounted) return;
     setState(() {
       _cvEnabled = cv;
       _isDark = dark;
       _presetIndex = preset;
+      _serverUrlCtrl.text = url;
     });
+  }
+
+  Future<void> _saveServerUrl() async {
+    final url = _serverUrlCtrl.text.trim();
+    if (url.isEmpty) return;
+    await SettingsService.setServerUrl(url);
+    DatabaseService.serverUrl = url;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Server URL saved — restart the app to reconnect.')),
+      );
+    }
   }
 
   @override
@@ -235,6 +258,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+          if (!kIsWeb) ...[
+            const SizedBox(height: 24),
+            _sectionHeader('SERVER CONNECTION'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.boksBlueLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.dns_rounded, color: AppTheme.boksBlue, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Server URL',
+                                style: TextStyle(
+                                    fontFamily: kFontFamily,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textDark)),
+                            const SizedBox(height: 2),
+                            Text('Address of your Bokses server',
+                                style: TextStyle(
+                                    fontFamily: kFontFamily,
+                                    fontSize: 12,
+                                    color: AppTheme.textMid)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _serverUrlCtrl,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    style: TextStyle(fontFamily: kFontFamily, fontSize: 14, color: AppTheme.textDark),
+                    decoration: InputDecoration(
+                      hintText: SettingsService.defaultServerUrl,
+                      hintStyle: TextStyle(color: AppTheme.textMid),
+                    ),
+                    onSubmitted: (_) => _saveServerUrl(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saveServerUrl,
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (_cvEnabled) ...[
             const SizedBox(height: 20),
             _sectionHeader('HOW IT WORKS'),

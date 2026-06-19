@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/database_service.dart';
+import 'services/settings_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -10,6 +12,7 @@ void main() async {
   final preset = prefs.getInt('theme_preset') ?? 0;
   AppTheme.setMode(isDark);
   AppTheme.setPreset(preset);
+  DatabaseService.serverUrl = await SettingsService.getServerUrl();
   runApp(const BoksesApp());
 }
 
