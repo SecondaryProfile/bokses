@@ -1,5 +1,26 @@
 # Bokses — Changelog
 
+## 0.1.4 — 2026-06-22
+
+### Added
+- Swipe right on items to reveal a yellow **Move** button — opens a centered popup to move the item to another box
+- AutoBoks front/rear camera toggle button overlaid on the live preview; tap to switch lenses mid-session
+- Item card borders now match the gradient color of their parent box (the box's position in the gradient determines the item border color)
+
+### Changed
+- Move to Box redesigned as a centered popup dialog instead of a bottom sheet
+- Item and box swipe menus now follow iOS single-open behaviour — opening one automatically closes any other
+- AutoBoks: snap sound and photo capture fire simultaneously via `Future.wait` instead of sequentially; removes the perceptible delay between the audio cue and the shutter
+- Photo and label picker shown side-by-side in the add and edit item dialogs
+- Search bar gets a solid surface background when active, ensuring text is legible over any custom photo background
+- Swipe action corner pockets show the correct color — blue on the edit/delete side, yellow on the move side
+
+### Fixed
+- Swipe action buttons restored to standard iOS-style rectangles after experimental edge-extension attempts
+- Swipe corner pockets no longer show white when an item is revealed; a hard-stop gradient ensures each side shows its action color
+
+---
+
 ## 0.1.3 — 2026-06-19
 
 ### Added

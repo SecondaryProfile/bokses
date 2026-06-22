@@ -24,7 +24,8 @@ import '../constants.dart';
 
 class BoxDetailScreen extends StatefulWidget {
   final Box box;
-  const BoxDetailScreen({super.key, required this.box});
+  final Color? accentColor;
+  const BoxDetailScreen({super.key, required this.box, this.accentColor});
 
   @override
   State<BoxDetailScreen> createState() => _BoxDetailScreenState();
@@ -228,14 +229,55 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           : null,
                     ),
                     const SizedBox(height: 16),
-                    _buildPhotoWidget(
-                      _resolvePath(photoPath),
-                      editable: true,
-                      onTap: () async {
-                        final path = await _capturePhoto();
-                        if (path != null) setModal(() => photoPath = path);
-                      },
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 110,
+                          child: _buildPhotoWidget(
+                            _resolvePath(photoPath),
+                            height: 110,
+                            editable: true,
+                            onTap: () async {
+                              final path = await _capturePhoto();
+                              if (path != null) setModal(() => photoPath = path);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _LabelPickerRow(
+                            labels: selectedLabels,
+                            onTap: () async {
+                              final result =
+                                  await showModalBottomSheet<List<ItemLabel>>(
+                                context: ctx,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) =>
+                                    LabelPickerSheet(initial: selectedLabels),
+                              );
+                              if (result != null) {
+                                setModal(() => selectedLabels = result);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
+                    if (photoPath != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () => setModal(() => photoPath = null),
+                        icon: Icon(Icons.close_rounded,
+                            size: 18, color: AppTheme.boksRed),
+                        label: Text('Remove photo',
+                            style: TextStyle(
+                                fontFamily: kFontFamily,
+                                color: AppTheme.boksRed,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ],
                   if (cvEnabled) ...[
                     _buildPhotoWidget(
@@ -339,7 +381,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           : null,
                     ),
                   ],
-                  if (photoPath != null) ...[
+                  if (cvEnabled && photoPath != null) ...[
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: () => setModal(() {
@@ -355,23 +397,25 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                               fontWeight: FontWeight.w600)),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  _LabelPickerRow(
-                    labels: selectedLabels,
-                    onTap: () async {
-                      final result =
-                          await showModalBottomSheet<List<ItemLabel>>(
-                        context: ctx,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) =>
-                            LabelPickerSheet(initial: selectedLabels),
-                      );
-                      if (result != null) {
-                        setModal(() => selectedLabels = result);
-                      }
-                    },
-                  ),
+                  if (cvEnabled) ...[
+                    const SizedBox(height: 12),
+                    _LabelPickerRow(
+                      labels: selectedLabels,
+                      onTap: () async {
+                        final result =
+                            await showModalBottomSheet<List<ItemLabel>>(
+                          context: ctx,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) =>
+                              LabelPickerSheet(initial: selectedLabels),
+                        );
+                        if (result != null) {
+                          setModal(() => selectedLabels = result);
+                        }
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -455,13 +499,41 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                         : null,
                   ),
                   const SizedBox(height: 16),
-                  _buildPhotoWidget(
-                    _resolvePath(photoPath),
-                    editable: true,
-                    onTap: () async {
-                      final path = await _capturePhoto();
-                      if (path != null) setModal(() => photoPath = path);
-                    },
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: _buildPhotoWidget(
+                          _resolvePath(photoPath),
+                          height: 110,
+                          editable: true,
+                          onTap: () async {
+                            final path = await _capturePhoto();
+                            if (path != null) setModal(() => photoPath = path);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _LabelPickerRow(
+                          labels: selectedLabels,
+                          onTap: () async {
+                            final result =
+                                await showModalBottomSheet<List<ItemLabel>>(
+                              context: ctx,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) =>
+                                  LabelPickerSheet(initial: selectedLabels),
+                            );
+                            if (result != null) {
+                              setModal(() => selectedLabels = result);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   if (photoPath != null) ...[
                     const SizedBox(height: 8),
@@ -476,23 +548,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                               fontWeight: FontWeight.w600)),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  _LabelPickerRow(
-                    labels: selectedLabels,
-                    onTap: () async {
-                      final result =
-                          await showModalBottomSheet<List<ItemLabel>>(
-                        context: ctx,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) =>
-                            LabelPickerSheet(initial: selectedLabels),
-                      );
-                      if (result != null) {
-                        setModal(() => selectedLabels = result);
-                      }
-                    },
-                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -554,7 +609,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
         content: Text('"${item.name}" removed'),
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
@@ -745,44 +800,79 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   }
 
   Widget _itemList() {
-    return ListView.separated(
+    final itemBorderColor =
+        (widget.accentColor ?? AppTheme.boksBlue).withValues(alpha: 0.5);
+    return SlidableAutoCloseBehavior(
+      child: ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
       itemCount: _items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
         final item = _items[i];
-        final card = Slidable(
-          key: ValueKey(item.id),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.5,
-            dismissible: DismissiblePane(
-                onDismissed: () => _swipeDeleteItem(item)),
-            children: [
-              SlidableAction(
-                onPressed: (_) => _showEditItemDialog(item),
-                backgroundColor: const Color(0xFF1976D2),
-                foregroundColor: Colors.white,
-                icon: Icons.edit_rounded,
-                label: 'Edit',
+        final card = ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFFBC02D),
+                  Color(0xFFFBC02D),
+                  Color(0xFF1976D2),
+                  Color(0xFF1976D2),
+                ],
+                stops: [0.0, 0.39, 0.39, 1.0],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-              SlidableAction(
-                onPressed: (_) => _deleteItem(item),
-                backgroundColor: const Color(0xFFE53935),
-                foregroundColor: Colors.white,
-                icon: Icons.delete_rounded,
-                label: 'Delete',
+            ),
+            child: Slidable(
+              key: ValueKey(item.id),
+              startActionPane: ActionPane(
+                motion: const DrawerMotion(),
+                extentRatio: 0.28,
+                children: [
+                  SlidableAction(
+                    onPressed: (_) => _showMoveItemDialog(item),
+                    backgroundColor: const Color(0xFFFBC02D),
+                    foregroundColor: Colors.black87,
+                    icon: Icons.drive_file_move_rounded,
+                    label: 'Move',
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: _ItemCard(
-            item: item,
-            resolvedPhotoPath: _resolvePath(item.photoPath),
-            index: i,
-            onEdit: () => _showEditItemDialog(item),
-            onDelete: () => _deleteItem(item),
-            onMove: () => _showMoveItemSheet(item),
-            buildPhotoWidget: _buildPhotoWidget,
+              endActionPane: ActionPane(
+                motion: const DrawerMotion(),
+                extentRatio: 0.5,
+                dismissible: DismissiblePane(
+                    onDismissed: () => _swipeDeleteItem(item)),
+                children: [
+                  SlidableAction(
+                    onPressed: (_) => _showEditItemDialog(item),
+                    backgroundColor: const Color(0xFF1976D2),
+                    foregroundColor: Colors.white,
+                    icon: Icons.edit_rounded,
+                    label: 'Edit',
+                  ),
+                  SlidableAction(
+                    onPressed: (_) => _deleteItem(item),
+                    backgroundColor: const Color(0xFFE53935),
+                    foregroundColor: Colors.white,
+                    icon: Icons.delete_rounded,
+                    label: 'Delete',
+                  ),
+                ],
+              ),
+              child: _ItemCard(
+                item: item,
+                resolvedPhotoPath: _resolvePath(item.photoPath),
+                borderColor: itemBorderColor,
+                index: i,
+                onEdit: () => _showEditItemDialog(item),
+                onDelete: () => _deleteItem(item),
+                onMove: () => _showMoveItemDialog(item),
+                buildPhotoWidget: _buildPhotoWidget,
+              ),
+            ),
           ),
         );
         if (_loadAll) return card;
@@ -792,36 +882,41 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                 delay: Duration(milliseconds: 50 * i), duration: 300.ms)
             .slideX(begin: 0.05, end: 0);
       },
+    ),
     );
   }
 
-  Future<void> _showMoveItemSheet(Item item) async {
-    await showModalBottomSheet(
+  Future<void> _showMoveItemDialog(Item item) async {
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _MoveToBoxSheet(
-        currentBoxId: widget.box.id,
-        onMove: (targetBox) async {
-          Navigator.of(ctx).pop();
-          final moved = Item(
-            id: item.id,
-            name: item.name,
-            photoPath: item.photoPath,
-            boxId: targetBox.id,
-            createdAt: item.createdAt,
-            labels: List.from(item.labels),
-          );
-          await DatabaseService.instance.updateItem(moved);
-          await _load();
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-              ..clearSnackBars()
-              ..showSnackBar(SnackBar(
-                content: Text('"${item.name}" moved to ${targetBox.name}'),
-              ));
-          }
-        },
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 56),
+        child: _MoveToBoxSheet(
+          currentBoxId: widget.box.id,
+          onMove: (targetBox) async {
+            Navigator.of(ctx).pop();
+            final moved = Item(
+              id: item.id,
+              name: item.name,
+              photoPath: item.photoPath,
+              boxId: targetBox.id,
+              createdAt: item.createdAt,
+              labels: List.from(item.labels),
+            );
+            await DatabaseService.instance.updateItem(moved);
+            await _load();
+            if (mounted) {
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(SnackBar(
+                  content: Text('"${item.name}" moved to ${targetBox.name}'),
+                  duration: const Duration(seconds: 3),
+                ));
+            }
+          },
+        ),
       ),
     );
   }
@@ -874,6 +969,9 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
   CameraController? _cameraController;
   bool _cameraReady = false;
   String? _cameraError;
+  bool _useFrontCamera = false;
+  bool _switchingCamera = false;
+  List<CameraDescription> _availableCameras = [];
 
   @override
   void initState() {
@@ -891,21 +989,22 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
     super.dispose();
   }
 
-  Future<void> _initCamera() async {
-    // Camera permission is requested in _startAutoBoks() before this sheet
-    // opens, so we can go straight to initialization here.
+  Future<void> _initCamera({bool useFront = false}) async {
     try {
       final cameras = await availableCameras();
+      if (mounted) setState(() => _availableCameras = cameras);
       if (cameras.isEmpty) {
         if (mounted) setState(() => _cameraError = 'No camera found');
         return;
       }
-      final back = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
+      final direction =
+          useFront ? CameraLensDirection.front : CameraLensDirection.back;
+      final target = cameras.firstWhere(
+        (c) => c.lensDirection == direction,
         orElse: () => cameras.first,
       );
       final controller = CameraController(
-        back,
+        target,
         ResolutionPreset.medium,
         enableAudio: false,
       );
@@ -927,16 +1026,19 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
     }
   }
 
-  Future<void> _playDing() async {
-    // TODO: Replace with a real audio asset (e.g. audioplayers package +
-    //   AudioPlayer().play(AssetSource('sounds/ding.mp3'))) for a proper ding.
-    // Placeholder: haptic pulse + TTS so there is always an audible cue.
-    HapticFeedback.heavyImpact();
-    try {
-      await _tts.speak('snap');
-    } catch (_) {}
-    await Future.delayed(const Duration(milliseconds: 300));
+  Future<void> _switchCamera() async {
+    if (_switchingCamera || _processing) return;
+    setState(() {
+      _switchingCamera = true;
+      _cameraReady = false;
+      _useFrontCamera = !_useFrontCamera;
+    });
+    await _cameraController?.dispose();
+    _cameraController = null;
+    await _initCamera(useFront: _useFrontCamera);
+    if (mounted) setState(() => _switchingCamera = false);
   }
+
 
   Future<void> _init() async {
     bool available = false;
@@ -1048,16 +1150,19 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
 
     if (widget.cameraEnabled && _cameraReady && _cameraController != null) {
       setState(() => _state = _AutoBoksState.capturing);
-      await _playDing();
-      if (mounted) {
-        try {
-          final xfile = await _cameraController!.takePicture();
-          final bytes = await xfile.readAsBytes();
-          photoPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-        } catch (_) {
-          // Capture failed — item will be added without a photo
-        }
-      }
+      HapticFeedback.heavyImpact();
+      await Future.wait([
+        () async {
+          try { await _tts.speak('snap'); } catch (_) {}
+        }(),
+        () async {
+          try {
+            final xfile = await _cameraController!.takePicture();
+            final bytes = await xfile.readAsBytes();
+            photoPath = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          } catch (_) {}
+        }(),
+      ]);
     }
 
     if (!mounted) return;
@@ -1231,7 +1336,6 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
               child: CameraPreview(_cameraController!),
             ),
           ),
-          // White flash overlay during capture
           if (_state == _AutoBoksState.capturing)
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
@@ -1239,6 +1343,30 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
                 height: 200,
                 width: double.infinity,
                 color: Colors.white.withValues(alpha: 0.45),
+              ),
+            ),
+          if (_availableCameras.length > 1)
+            Positioned(
+              top: 10,
+              right: 10,
+              child: GestureDetector(
+                onTap: _switchingCamera ? null : _switchCamera,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _switchingCamera ? 0.4 : 1.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.flip_camera_ios_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
               ),
             ),
         ],
@@ -1368,6 +1496,7 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
 class _ItemCard extends StatefulWidget {
   final Item item;
   final String? resolvedPhotoPath;
+  final Color borderColor;
   final int index;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -1378,6 +1507,7 @@ class _ItemCard extends StatefulWidget {
   const _ItemCard({
     required this.item,
     required this.resolvedPhotoPath,
+    required this.borderColor,
     required this.index,
     required this.onEdit,
     required this.onDelete,
@@ -1435,7 +1565,7 @@ class _ItemCardState extends State<_ItemCard> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+        border: Border.all(color: widget.borderColor, width: 2.0),
       ),
       child: Row(
         children: [
@@ -1727,26 +1857,15 @@ class _MoveToBoxSheetState extends State<_MoveToBoxSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.bubblePurple,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
           Text(
             'Move to Box',
             style: TextStyle(
@@ -1786,7 +1905,6 @@ class _MoveToBoxSheetState extends State<_MoveToBoxSheet> {
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
                 itemCount: _boxes.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
@@ -1850,18 +1968,6 @@ class _MoveToBoxSheetState extends State<_MoveToBoxSheet> {
                 },
               ),
             ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.textMid,
-                side: BorderSide(color: AppTheme.bubblePurple, width: 1.5),
-              ),
-              child: const Text('Cancel'),
-            ),
-          ),
         ],
       ),
     );

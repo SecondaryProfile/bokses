@@ -36,6 +36,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _loadAll = true;
   final _menuKey = GlobalKey();
+  final Map<String, GlobalKey> _gridKeys = {};
+  final Map<String, GlobalKey> _listKeys = {};
+  bool _animateSwitch = false;
   BoxSort _sort = BoxSort.dateAsc;
   BoxViewMode _viewMode = BoxViewMode.grid;
 
@@ -418,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ? '"${box.name}" removed'
               : '"${box.name}" and ${items.length} $itemWord removed',
         ),
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
@@ -529,8 +532,9 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         toolbarHeight: 64,
-        backgroundColor:
-            _hasCustomBg ? Colors.transparent : AppTheme.background,
+        backgroundColor: _searching
+            ? AppTheme.surface
+            : (_hasCustomBg ? Colors.transparent : AppTheme.background),
         centerTitle: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -732,9 +736,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: _boxes.isEmpty
                           ? _emptyState()
-                          : _viewMode == BoxViewMode.grid
-                              ? _boxGrid()
-                              : _boxList(),
+                          : AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 320),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween(begin: 0.95, end: 1.0)
+                                          .animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
+                              child: KeyedSubtree(
+                                key: ValueKey(_viewMode),
+                                child: _viewMode == BoxViewMode.grid
+                                    ? _boxGrid()
+                                    : _boxList(),
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -871,7 +892,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           _ViewToggleButton(
             mode: _viewMode,
-            onChanged: (m) => setState(() => _viewMode = m),
+            onChanged: (m) {
+              setState(() {
+                _viewMode = m;
+                _animateSwitch = true;
+              });
+              Future.delayed(const Duration(milliseconds: 700),
+                  () { if (mounted) setState(() => _animateSwitch = false); });
+            },
           ),
         ],
       ),
@@ -931,37 +959,51 @@ class _HomeScreenState extends State<HomeScreen> {
         final box = boxes[i];
         final count = _itemCounts[box.id] ?? 0;
         final labels = _boxLabels[box.id] ?? {};
-        final card = _BoxCard(
-          box: box,
-          itemCount: count,
-          index: i,
-          totalBoxes: boxes.length,
-          labels: labels,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => BoxDetailScreen(box: box)),
-            );
-            _load();
-          },
-          onDelete: () => _deleteBox(box),
-          onEdit: () => _showEditBoxDialog(box),
+        final key = _gridKeys.putIfAbsent(box.id, GlobalKey.new);
+        final t = boxes.length > 1 ? i / (boxes.length - 1) : 0.0;
+        final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+        final card = SizedBox(
+          key: key,
+          child: _BoxCard(
+            box: box,
+            itemCount: count,
+            index: i,
+            totalBoxes: boxes.length,
+            labels: labels,
+            onTap: () async {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              final ro =
+                  key.currentContext?.findRenderObject() as RenderBox?;
+              final rect = ro != null
+                  ? ro.localToGlobal(Offset.zero) & ro.size
+                  : Rect.zero;
+              await Navigator.push(
+                context,
+                _BoxOpenRoute(
+                    sourceRect: rect,
+                    page: BoxDetailScreen(box: box, accentColor: accentColor)),
+              );
+              _load();
+            },
+            onDelete: () => _deleteBox(box),
+            onEdit: () => _showEditBoxDialog(box),
+          ),
         );
-        if (_loadAll) return card;
+        if (_loadAll && !_animateSwitch) return card;
         return card
             .animate()
             .fadeIn(
-                delay: Duration(milliseconds: 60 * i),
-                duration: 300.ms)
-            .slideY(begin: 0.1, end: 0);
+                delay: Duration(milliseconds: _animateSwitch ? 22 * i : 60 * i),
+                duration: _animateSwitch ? 200.ms : 300.ms)
+            .slideY(begin: _animateSwitch ? 0.05 : 0.1, end: 0);
       },
     );
   }
 
   Widget _boxList() {
     final boxes = _sortedBoxes;
-    return ListView.separated(
+    return SlidableAutoCloseBehavior(
+      child: ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
       itemCount: boxes.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -969,32 +1011,46 @@ class _HomeScreenState extends State<HomeScreen> {
         final box = boxes[i];
         final count = _itemCounts[box.id] ?? 0;
         final labels = _boxLabels[box.id] ?? {};
-        final tile = _BoxListTile(
-          box: box,
-          itemCount: count,
-          index: i,
-          totalBoxes: boxes.length,
-          labels: labels,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => BoxDetailScreen(box: box)),
-            );
-            _load();
-          },
-          onEdit: () => _showEditBoxDialog(box),
-          onDelete: () => _deleteBox(box),
-          onDeleteImmediate: () => _swipeDeleteBox(box),
+        final key = _listKeys.putIfAbsent(box.id, GlobalKey.new);
+        final t = boxes.length > 1 ? i / (boxes.length - 1) : 0.0;
+        final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+        final tile = SizedBox(
+          key: key,
+          child: _BoxListTile(
+            box: box,
+            itemCount: count,
+            index: i,
+            totalBoxes: boxes.length,
+            labels: labels,
+            onTap: () async {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              final ro =
+                  key.currentContext?.findRenderObject() as RenderBox?;
+              final rect = ro != null
+                  ? ro.localToGlobal(Offset.zero) & ro.size
+                  : Rect.zero;
+              await Navigator.push(
+                context,
+                _BoxOpenRoute(
+                    sourceRect: rect,
+                    page: BoxDetailScreen(box: box, accentColor: accentColor)),
+              );
+              _load();
+            },
+            onEdit: () => _showEditBoxDialog(box),
+            onDelete: () => _deleteBox(box),
+            onDeleteImmediate: () => _swipeDeleteBox(box),
+          ),
         );
-        if (_loadAll) return tile;
+        if (_loadAll && !_animateSwitch) return tile;
         return tile
             .animate()
             .fadeIn(
-                delay: Duration(milliseconds: 40 * i),
-                duration: 200.ms)
-            .slideX(begin: 0.04, end: 0);
+                delay: Duration(milliseconds: _animateSwitch ? 18 * i : 40 * i),
+                duration: _animateSwitch ? 180.ms : 200.ms)
+            .slideX(begin: _animateSwitch ? 0.03 : 0.04, end: 0);
       },
+    ),
     );
   }
 }
@@ -1086,33 +1142,50 @@ class _SortButton extends StatelessWidget {
 
 // ── View toggle button ─────────────────────────────────────────────────────────
 
-class _ViewToggleButton extends StatelessWidget {
+class _ViewToggleButton extends StatefulWidget {
   final BoxViewMode mode;
   final ValueChanged<BoxViewMode> onChanged;
 
-  const _ViewToggleButton(
-      {required this.mode, required this.onChanged});
+  const _ViewToggleButton({required this.mode, required this.onChanged});
+
+  @override
+  State<_ViewToggleButton> createState() => _ViewToggleButtonState();
+}
+
+class _ViewToggleButtonState extends State<_ViewToggleButton> {
+  bool _enabled = true;
+
+  void _onTap() {
+    if (!_enabled) return;
+    widget.onChanged(widget.mode == BoxViewMode.grid
+        ? BoxViewMode.list
+        : BoxViewMode.grid);
+    setState(() => _enabled = false);
+    Future.delayed(const Duration(milliseconds: 2500),
+        () { if (mounted) setState(() => _enabled = true); });
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => onChanged(mode == BoxViewMode.grid
-          ? BoxViewMode.list
-          : BoxViewMode.grid),
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(10),
-          border:
-              Border.all(color: AppTheme.bubblePurple, width: 1.5),
-        ),
-        child: Icon(
-          mode == BoxViewMode.grid
-              ? Icons.view_list_rounded
-              : Icons.grid_view_rounded,
-          size: 16,
-          color: AppTheme.textMid,
+      onTap: _onTap,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: _enabled ? 1.0 : 0.35,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          ),
+          child: Icon(
+            widget.mode == BoxViewMode.grid
+                ? Icons.view_list_rounded
+                : Icons.grid_view_rounded,
+            size: 16,
+            color: AppTheme.textMid,
+          ),
         ),
       ),
     );
@@ -1218,8 +1291,7 @@ class _BoxCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border:
-              Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          border: Border.all(color: accentColor, width: 3.0),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1393,108 +1465,105 @@ class _BoxListTile extends StatelessWidget {
     final accentBright = Color.lerp(
         AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
 
-    return Slidable(
-      key: ValueKey(box.id),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.5,
-        dismissible: DismissiblePane(onDismissed: onDeleteImmediate),
-        children: [
-          SlidableAction(
-            onPressed: (_) => onEdit(),
-            backgroundColor: const Color(0xFF1976D2),
-            foregroundColor: Colors.white,
-            icon: Icons.edit_rounded,
-            label: 'Edit',
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: ColoredBox(
+        color: const Color(0xFF1976D2),
+        child: Slidable(
+          key: ValueKey(box.id),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.5,
+            dismissible: DismissiblePane(onDismissed: onDeleteImmediate),
+            children: [
+              SlidableAction(
+                onPressed: (_) => onEdit(),
+                backgroundColor: const Color(0xFF1976D2),
+                foregroundColor: Colors.white,
+                icon: Icons.edit_rounded,
+                label: 'Edit',
+              ),
+              SlidableAction(
+                onPressed: (_) => onDelete(),
+                backgroundColor: const Color(0xFFE53935),
+                foregroundColor: Colors.white,
+                icon: Icons.delete_rounded,
+                label: 'Delete',
+              ),
+            ],
           ),
-          SlidableAction(
-            onPressed: (_) => onDelete(),
-            backgroundColor: const Color(0xFFE53935),
-            foregroundColor: Colors.white,
-            icon: Icons.delete_rounded,
-            label: 'Delete',
-          ),
-        ],
-      ),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-                color: AppTheme.bubblePurple, width: 1.5),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                Container(
-                  width: 5,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
                   decoration: BoxDecoration(
-                    color: accentColor,
-                    borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(19)),
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accentColor, width: 3.0),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          box.name,
-                          style: TextStyle(
-                            fontFamily: kFontFamily,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: accentColor,
-                          ),
-                        ),
-                        if (box.description != null &&
-                            box.description!.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            box.description!,
-                            style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontSize: 12,
-                              color: AppTheme.textMid,
+                        Container(width: 5, color: accentColor),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  box.name,
+                                  style: TextStyle(
+                                    fontFamily: kFontFamily,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: accentColor,
+                                  ),
+                                ),
+                                if (box.description != null &&
+                                    box.description!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    box.description!,
+                                    style: TextStyle(
+                                      fontFamily: kFontFamily,
+                                      fontSize: 12,
+                                      color: AppTheme.textMid,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                if (labels.isNotEmpty) ...[
+                                  const SizedBox(height: 5),
+                                  LabelBadgesRow(labels: labels),
+                                ],
+                                const SizedBox(height: 3),
+                                Text(
+                                  '$itemCount item${itemCount == 1 ? '' : 's'}',
+                                  style: TextStyle(
+                                    fontFamily: kFontFamily,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: accentBright,
+                                  ),
+                                ),
+                              ],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        if (labels.isNotEmpty) ...[
-                          const SizedBox(height: 5),
-                          LabelBadgesRow(labels: labels),
-                        ],
-                        const SizedBox(height: 3),
-                        Text(
-                          '$itemCount item${itemCount == 1 ? '' : 's'}',
-                          style: TextStyle(
-                            fontFamily: kFontFamily,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: accentBright,
                           ),
                         ),
+                        Icon(Icons.chevron_right_rounded,
+                            color: AppTheme.textMid, size: 20),
+                        const SizedBox(width: 12),
                       ],
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded,
-                    color: AppTheme.textMid, size: 20),
-                const SizedBox(width: 12),
-              ],
-            ),
-          ),
+              ),
         ),
       ),
-    );
+  );
   }
 }
 
@@ -1764,5 +1833,66 @@ class _ImportProgressDialog extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Box open transition ────────────────────────────────────────────────────────
+
+class _BoxOpenRoute extends PageRouteBuilder {
+  final Rect sourceRect;
+
+  _BoxOpenRoute({required this.sourceRect, required Widget page})
+      : super(
+          opaque: false,
+          barrierColor: Colors.transparent,
+          transitionDuration: const Duration(milliseconds: 500),
+          reverseTransitionDuration: const Duration(milliseconds: 360),
+          pageBuilder: (_, __, ___) => page,
+          transitionsBuilder: (ctx, animation, _, child) {
+            final size = MediaQuery.sizeOf(ctx);
+            final targetRect = Offset.zero & size;
+            final scaleOrigin = Alignment(
+              (sourceRect.center.dx / size.width) * 2 - 1,
+              (sourceRect.center.dy / size.height) * 2 - 1,
+            );
+            return AnimatedBuilder(
+              animation: animation,
+              builder: (_, child) {
+                final t = Curves.easeOut.transform(animation.value);
+                final rect =
+                    RectTween(begin: sourceRect, end: targetRect).lerp(t)!;
+                final radius = 22.0 * (1.0 - t);
+                final scale = 1.14 - 0.14 * t;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: Colors.black
+                          .withValues(alpha: animation.value * 0.35),
+                    ),
+                    Positioned(
+                      left: rect.left,
+                      top: rect.top,
+                      width: rect.width,
+                      height: rect.height,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(radius),
+                        child: Transform.scale(
+                          scale: scale,
+                          alignment: scaleOrigin,
+                          child: SizedBox(
+                            width: size.width,
+                            height: size.height,
+                            child: child,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+              child: child,
+            );
+          },
+        );
 }
 
