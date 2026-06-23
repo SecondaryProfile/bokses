@@ -1,7 +1,7 @@
 name: bokses
 description: A bubbly box storage management app — know what's in every box.
 publish_to: 'none'
-version: 0.1.4+1
+version: 0.10.0+10
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,6 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
   web: ^1.0.0
+  http: ^1.2.0
+  tflite_flutter: ^0.12.1
+  onnxruntime: ^1.2.0
+  image: ^4.2.0
   speech_to_text: ^7.0.0
   flutter_tts: ^4.0.2
   shared_preferences: ^2.2.2

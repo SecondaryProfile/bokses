@@ -394,9 +394,10 @@ class LabelPillsRow extends StatelessWidget {
     final ordered = ItemLabel.values.where(labels.contains).toList();
     return LayoutBuilder(
       builder: (_, constraints) {
-        final totalGap = _gap * (ordered.length - 1);
+        final maxCount = ItemLabel.values.length;
+        final totalGap = _gap * (maxCount - 1);
         final pillWidth =
-            (constraints.maxWidth - totalGap) / ordered.length;
+            (constraints.maxWidth - totalGap) / maxCount;
         return Row(
           children: [
             for (int i = 0; i < ordered.length; i++) ...[

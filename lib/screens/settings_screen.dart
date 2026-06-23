@@ -3,8 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/settings_service.dart';
+import '../services/model_service.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
+import '../models/cv_model_def.dart';
+import 'model_hub_screen.dart';
 import 'version_history_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -32,6 +35,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Computer Vision
   bool _cvEnabled = false;
+  bool _modelInstalled = false;
+  CvModelTier? _activeCvTier;
 
   // Performance
   bool _loadAll = true;
@@ -54,6 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final autoBoksCamera = await SettingsService.getAutoBoksCameraEnabled();
     final cv = await SettingsService.getCvEnabled();
     final loadAll = await SettingsService.getLoadAllContent();
+    final activeTier = await ModelService.activeTier();
+    final installed =
+        activeTier != null ? await ModelService.isInstalled(activeTier) : false;
     if (!mounted) return;
 
     Uint8List? bgImage;
@@ -75,6 +83,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _autoBoksCamera = autoBoksCamera;
       _cvEnabled = cv;
       _loadAll = loadAll;
+      _modelInstalled = installed;
+      _activeCvTier = activeTier;
     });
   }
 
@@ -492,69 +502,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.auto_awesome_rounded,
               iconColor: AppTheme.boksBlue,
               iconBg: AppTheme.boksBlueLight,
-              title: 'Computer Vision',
-              subtitle: 'Identify items from photos using on-device AI',
-              trailing: Switch(
-                value: _cvEnabled,
-                activeThumbColor: AppTheme.boksBlue,
-                activeTrackColor: AppTheme.boksBlueLight,
-                onChanged: (v) async {
-                  if (v) {
-                    await showDialog<void>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text(
-                          'Experimental Feature',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              fontWeight: FontWeight.w800),
-                        ),
-                        content: const Text(
-                          'Computer vision is experimental. The current models '
-                          'are not very accurate — results are expected to improve '
-                          'over time.',
-                          style: TextStyle(fontFamily: kFontFamily),
-                        ),
-                        actions: [
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Got it'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  await SettingsService.setCvEnabled(v);
-                  setState(() => _cvEnabled = v);
-                },
-              ),
+              title: 'Model Hub',
+              subtitle: _activeCvTierLabel(),
+              trailing: Icon(Icons.chevron_right_rounded, color: AppTheme.textMid),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ModelHubScreen()),
+                );
+                final tier = await ModelService.activeTier();
+                final installed =
+                    tier != null ? await ModelService.isInstalled(tier) : false;
+                if (mounted) {
+                  setState(() {
+                    _modelInstalled = installed;
+                    _activeCvTier = tier;
+                  });
+                }
+              },
             ),
-            if (_cvEnabled) ...[
+            if (_modelInstalled) ...[
               _groupDivider(),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _StepRow(
-                      icon: Icons.camera_alt_rounded,
-                      isPrimary: true,
-                      text: 'Take a photo of your item',
-                    ),
-                    const SizedBox(height: 10),
-                    _StepRow(
-                      icon: Icons.auto_awesome_rounded,
-                      isPrimary: false,
-                      text: 'On-device AI analyses the image instantly',
-                    ),
-                    const SizedBox(height: 10),
-                    _StepRow(
-                      icon: Icons.checklist_rounded,
-                      isPrimary: true,
-                      text: 'Pick from 5 guesses or type the name yourself',
-                    ),
-                  ],
+              _settingsTile(
+                icon: Icons.memory_rounded,
+                iconColor: AppTheme.boksBlue,
+                iconBg: AppTheme.boksBlueLight,
+                title: 'Enable Computer Vision',
+                subtitle: 'Suggest item names from photos using on-device AI',
+                trailing: Switch(
+                  value: _cvEnabled,
+                  activeThumbColor: AppTheme.boksBlue,
+                  activeTrackColor: AppTheme.boksBlueLight,
+                  onChanged: (v) async {
+                    await SettingsService.setCvEnabled(v);
+                    setState(() => _cvEnabled = v);
+                  },
                 ),
               ),
+              if (_cvEnabled) ...[
+                _groupDivider(),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _StepRow(
+                        icon: Icons.camera_alt_rounded,
+                        isPrimary: true,
+                        text: 'Take a photo of your item',
+                      ),
+                      const SizedBox(height: 10),
+                      _StepRow(
+                        icon: Icons.auto_awesome_rounded,
+                        isPrimary: false,
+                        text: 'On-device AI analyses the image instantly',
+                      ),
+                      const SizedBox(height: 10),
+                      _StepRow(
+                        icon: Icons.checklist_rounded,
+                        isPrimary: true,
+                        text: 'Pick from 5 guesses or type the name yourself',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ]),
           const SizedBox(height: 40),
@@ -582,6 +593,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  String _activeCvTierLabel() {
+    if (_activeCvTier == null) return 'No model installed';
+    final def = kCvModels.firstWhere((m) => m.tier == _activeCvTier!);
+    return '${def.modelName} (${def.displayName})';
+  }
 
   Widget _sectionLabel(String title) {
     return Padding(

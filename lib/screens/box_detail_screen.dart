@@ -19,6 +19,8 @@ import '../services/database_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/label_badges.dart';
 import '../services/vision_service.dart';
+import '../services/image_search_service.dart';
+import 'image_search_sheet.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
 
@@ -35,8 +37,26 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   List<Item> _items = [];
   bool _loading = true;
   bool _loadAll = true;
+  bool _bulkFilling = false;
+  int _bulkDone = 0;
+  int _bulkTotal = 0;
   final _picker = ImagePicker();
   String _docsDir = '';
+  ScaffoldMessengerState? _messenger;
+  Timer? _snackTimer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.of(context);
+  }
+
+  @override
+  void dispose() {
+    _snackTimer?.cancel();
+    _messenger?.clearSnackBars();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -75,6 +95,95 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     }
   }
 
+  Future<void> _bulkFillImages() async {
+    final targets =
+        _items.where((i) => i.photoPath == null || i.photoPath!.isEmpty).toList();
+
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All items already have photos.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Auto-fill Photos?',
+          style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'This will search the internet for the first matching photo for '
+          'each of the ${targets.length} item${targets.length == 1 ? '' : 's'} '
+          'that currently have no image, and set it automatically.\n\n'
+          'The results come from a web search — they may be incorrect or '
+          'unrelated to your actual item. You can always edit each photo later.',
+          style: const TextStyle(fontFamily: kFontFamily, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: kFontFamily, color: AppTheme.textMid)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.boksBlue),
+            child: const Text('Yes, fill them all',
+                style: TextStyle(fontFamily: kFontFamily)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _bulkFilling = true;
+      _bulkDone = 0;
+      _bulkTotal = targets.length;
+    });
+
+    int filled = 0;
+    for (final item in targets) {
+      if (!mounted) break;
+      try {
+        final results = await ImageSearchService.search(item.name);
+        if (results.isNotEmpty) {
+          final uri = await ImageSearchService.downloadAsDataUri(
+              results.first.thumbnailUrl);
+          item.photoPath = uri;
+          item.webPhoto = true;
+          await DatabaseService.instance.updateItem(item);
+          filled++;
+        }
+      } catch (_) {
+        // skip items where the search or download fails
+      }
+      if (mounted) setState(() => _bulkDone++);
+      // Brief pause between requests to avoid rate-limiting.
+      await Future.delayed(const Duration(milliseconds: 600));
+    }
+
+    if (!mounted) return;
+    setState(() => _bulkFilling = false);
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          filled == targets.length
+              ? 'Added photos to $filled item${filled == 1 ? '' : 's'}.'
+              : 'Added $filled of ${targets.length} photos — some searches failed.',
+        ),
+      ));
+    }
+  }
+
   Future<String?> _capturePhoto() async {
     try {
       final xfile = await _picker.pickImage(
@@ -96,7 +205,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   }
 
   Widget _buildPhotoWidget(String? path,
-      {double height = 120, bool editable = false, VoidCallback? onTap}) {
+      {double height = 120, bool editable = false, bool webPhoto = false, VoidCallback? onTap}) {
     Widget inner;
     if (path != null && path.isNotEmpty) {
       Widget img;
@@ -135,20 +244,40 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                     size: 18, color: AppTheme.boksBlue),
               ),
             ),
+          if (webPhoto)
+            Positioned(
+              bottom: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.language_rounded,
+                    size: 11, color: Colors.white),
+              ),
+            ),
         ],
       );
     } else {
+      final iconSize = height >= 140 ? 38.0 : 26.0;
+      final fontSize = height >= 140 ? 13.0 : 11.0;
       inner = Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.camera_alt_rounded, color: AppTheme.boksBlue, size: 36),
-          const SizedBox(height: 8),
+          Icon(Icons.add_photo_alternate_rounded,
+              color: AppTheme.boksBlue, size: iconSize),
+          const SizedBox(height: 6),
           Text(
-            editable ? 'Tap to take photo' : 'No photo',
+            editable ? 'Add a photo' : 'No photo',
+            textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontFamily,
-                color: AppTheme.boksBlue,
-                fontWeight: FontWeight.w700),
+              fontFamily: kFontFamily,
+              fontSize: fontSize,
+              color: AppTheme.boksBlue,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       );
@@ -174,6 +303,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     final nameCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     String? photoPath;
+    bool isWebPhoto = false;
     bool analyzing = false;
     List<String>? suggestions;
     List<ItemLabel> selectedLabels = [];
@@ -197,7 +327,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
             ),
             child: Form(
               key: formKey,
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -232,17 +363,45 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 110,
-                          child: _buildPhotoWidget(
-                            _resolvePath(photoPath),
-                            height: 110,
-                            editable: true,
-                            onTap: () async {
-                              final path = await _capturePhoto();
-                              if (path != null) setModal(() => photoPath = path);
-                            },
-                          ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 110,
+                              child: _buildPhotoWidget(
+                                _resolvePath(photoPath),
+                                height: 110,
+                                editable: true,
+                                webPhoto: isWebPhoto,
+                                onTap: () async {
+                                  final path = await _capturePhoto();
+                                  if (path != null) setModal(() { photoPath = path; isWebPhoto = false; });
+                                },
+                              ),
+                            ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: Icon(Icons.language_rounded, size: 13, color: AppTheme.boksBlue),
+                              label: Text('Find online',
+                                style: TextStyle(fontFamily: kFontFamily, fontSize: 12,
+                                    fontWeight: FontWeight.w600, color: AppTheme.boksBlue)),
+                              onPressed: () async {
+                                final uri = await showModalBottomSheet<String>(
+                                  context: ctx,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => ImageSearchSheet(
+                                    initialQuery: nameCtrl.text.trim(),
+                                  ),
+                                );
+                                if (uri != null) setModal(() { photoPath = uri; isWebPhoto = true; });
+                              },
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -268,7 +427,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                     if (photoPath != null) ...[
                       const SizedBox(height: 8),
                       TextButton.icon(
-                        onPressed: () => setModal(() => photoPath = null),
+                        onPressed: () => setModal(() { photoPath = null; isWebPhoto = false; }),
                         icon: Icon(Icons.close_rounded,
                             size: 18, color: AppTheme.boksRed),
                         label: Text('Remove photo',
@@ -283,11 +442,13 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                     _buildPhotoWidget(
                       _resolvePath(photoPath),
                       editable: true,
+                      webPhoto: isWebPhoto,
                       onTap: () async {
                         final path = await _capturePhoto();
                         if (path == null) return;
                         setModal(() {
                           photoPath = path;
+                          isWebPhoto = false;
                           suggestions = null;
                         });
                         setModal(() => analyzing = true);
@@ -381,21 +542,45 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           : null,
                     ),
                   ],
-                  if (cvEnabled && photoPath != null) ...[
+                  if (cvEnabled) ...[
                     const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () => setModal(() {
-                        photoPath = null;
-                        suggestions = null;
-                      }),
-                      icon: Icon(Icons.close_rounded,
-                          size: 18, color: AppTheme.boksRed),
-                      label: Text('Remove photo',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              color: AppTheme.boksRed,
-                              fontWeight: FontWeight.w600)),
-                    ),
+                    Row(children: [
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: Icon(Icons.language_rounded, size: 13, color: AppTheme.boksBlue),
+                        label: Text('Find online',
+                          style: TextStyle(fontFamily: kFontFamily, fontSize: 12,
+                              fontWeight: FontWeight.w600, color: AppTheme.boksBlue)),
+                        onPressed: () async {
+                          final uri = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => ImageSearchSheet(initialQuery: nameCtrl.text.trim()),
+                          );
+                          if (uri != null) setModal(() { photoPath = uri; isWebPhoto = true; suggestions = null; });
+                        },
+                      ),
+                      if (photoPath != null) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => setModal(() { photoPath = null; isWebPhoto = false; suggestions = null; }),
+                          icon: Icon(Icons.close_rounded, size: 13, color: AppTheme.boksRed),
+                          label: Text('Remove photo',
+                              style: TextStyle(fontFamily: kFontFamily, fontSize: 12,
+                                  color: AppTheme.boksRed, fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ]),
                   ],
                   if (cvEnabled) ...[
                     const SizedBox(height: 12),
@@ -426,6 +611,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                           id: const Uuid().v4(),
                           name: nameCtrl.text.trim(),
                           photoPath: photoPath,
+                          webPhoto: isWebPhoto,
                           boxId: widget.box.id,
                           createdAt: DateTime.now(),
                           labels: selectedLabels,
@@ -439,6 +625,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   ),
                 ],
               ),
+              ),
             ),
           ),
         ),
@@ -450,6 +637,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     final nameCtrl = TextEditingController(text: item.name);
     final formKey = GlobalKey<FormState>();
     String? photoPath = item.photoPath;
+    bool isWebPhoto = item.webPhoto;
     List<ItemLabel> selectedLabels = List.from(item.labels);
 
     await showModalBottomSheet(
@@ -469,7 +657,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
             ),
             child: Form(
               key: formKey,
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -498,57 +687,101 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                         ? 'Name required'
                         : null,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+
+                  // ── Photo ──────────────────────────────────────────────────
+                  _buildPhotoWidget(
+                    _resolvePath(photoPath),
+                    height: 160,
+                    editable: true,
+                    webPhoto: isWebPhoto,
+                    onTap: () async {
+                      final path = await _capturePhoto();
+                      if (path != null) {
+                        setModal(() { photoPath = path; isWebPhoto = false; });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ── Photo action buttons ───────────────────────────────────
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        width: 110,
-                        child: _buildPhotoWidget(
-                          _resolvePath(photoPath),
-                          height: 110,
-                          editable: true,
-                          onTap: () async {
-                            final path = await _capturePhoto();
-                            if (path != null) setModal(() => photoPath = path);
-                          },
-                        ),
+                      _PhotoActionButton(
+                        icon: Icons.camera_alt_rounded,
+                        label: 'Camera',
+                        color: AppTheme.boksBlue,
+                        onTap: () async {
+                          final path = await _capturePhoto();
+                          if (path != null) {
+                            setModal(() { photoPath = path; isWebPhoto = false; });
+                          }
+                        },
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _LabelPickerRow(
-                          labels: selectedLabels,
-                          onTap: () async {
-                            final result =
-                                await showModalBottomSheet<List<ItemLabel>>(
-                              context: ctx,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (_) =>
-                                  LabelPickerSheet(initial: selectedLabels),
-                            );
-                            if (result != null) {
-                              setModal(() => selectedLabels = result);
-                            }
-                          },
-                        ),
+                      const SizedBox(width: 8),
+                      _PhotoActionButton(
+                        icon: Icons.language_rounded,
+                        label: 'Find online',
+                        color: AppTheme.boksBlue,
+                        onTap: () async {
+                          final uri = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => ImageSearchSheet(
+                              initialQuery: nameCtrl.text.trim().isEmpty
+                                  ? item.name
+                                  : nameCtrl.text.trim(),
+                            ),
+                          );
+                          if (uri != null) {
+                            setModal(() { photoPath = uri; isWebPhoto = true; });
+                          }
+                        },
                       ),
+                      if (photoPath != null) ...[
+                        const Spacer(),
+                        _PhotoActionButton(
+                          icon: Icons.delete_outline_rounded,
+                          label: 'Remove',
+                          color: const Color(0xFFE53935),
+                          onTap: () => setModal(() { photoPath = null; isWebPhoto = false; }),
+                        ),
+                      ],
                     ],
                   ),
-                  if (photoPath != null) ...[
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () => setModal(() => photoPath = null),
-                      icon: Icon(Icons.close_rounded,
-                          size: 18, color: AppTheme.boksRed),
-                      label: Text('Remove photo',
-                          style: TextStyle(
-                              fontFamily: kFontFamily,
-                              color: AppTheme.boksRed,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ],
                   const SizedBox(height: 20),
+
+                  // ── Labels ─────────────────────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: AppTheme.bubblePurple, width: 1.5),
+                    ),
+                    child: _LabelPickerRow(
+                      labels: selectedLabels,
+                      onTap: () async {
+                        final result =
+                            await showModalBottomSheet<List<ItemLabel>>(
+                          context: ctx,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) =>
+                              LabelPickerSheet(initial: selectedLabels),
+                        );
+                        if (result != null) {
+                          setModal(() => selectedLabels = result);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -556,6 +789,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                         if (!formKey.currentState!.validate()) return;
                         item.name = nameCtrl.text.trim();
                         item.photoPath = photoPath;
+                        item.webPhoto = isWebPhoto;
                         item.labels = selectedLabels;
                         await DatabaseService.instance.updateItem(item);
                         if (ctx.mounted) Navigator.pop(ctx);
@@ -566,6 +800,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   ),
                 ],
               ),
+              ),
             ),
           ),
         ),
@@ -573,51 +808,27 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     );
   }
 
-  Future<void> _deleteItem(Item item) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete "${item.name}"?',
-            style: const TextStyle(
-                fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
-        content: const Text('This item will be permanently removed.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935)),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await DatabaseService.instance.deleteItem(item.id);
-      _load();
-    }
-  }
+  Future<void> _deleteItem(Item item) => _swipeDeleteItem(item);
 
   Future<void> _swipeDeleteItem(Item item) async {
     setState(() => _items.removeWhere((i) => i.id == item.id));
     await DatabaseService.instance.deleteItem(item.id);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(
-        content: Text('"${item.name}" removed'),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
-            await DatabaseService.instance.insertItem(item);
-            if (mounted) await _load();
-          },
-        ),
-      ));
+    _snackTimer?.cancel();
+    final messenger = ScaffoldMessenger.of(context)..clearSnackBars();
+    final ctrl = messenger.showSnackBar(SnackBar(
+      content: Text('"${item.name}" removed'),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () async {
+          _snackTimer?.cancel();
+          await DatabaseService.instance.insertItem(item);
+          if (mounted) await _load();
+        },
+      ),
+    ));
+    _snackTimer = Timer(const Duration(milliseconds: 2500), ctrl.close);
   }
 
   Future<void> _startAutoBoks() async {
@@ -707,25 +918,60 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.box.name, overflow: TextOverflow.ellipsis),
-        bottom: (widget.box.description != null &&
-                widget.box.description!.isNotEmpty)
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(26),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                  child: Text(
-                    widget.box.description!,
-                    style: TextStyle(
-                      fontFamily: kFontFamily,
-                      fontSize: 13,
-                      color: AppTheme.textMid,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+        actions: [
+          if (!_bulkFilling &&
+              !_loading &&
+              _items.any((i) => i.photoPath == null || i.photoPath!.isEmpty))
+            IconButton(
+              icon: const Icon(Icons.image_search_rounded),
+              tooltip: 'Auto-fill missing photos',
+              onPressed: _bulkFillImages,
+            ),
+          if (_bulkFilling)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: Text(
+                  '$_bulkDone / $_bulkTotal',
+                  style: TextStyle(
+                    fontFamily: kFontFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.boksBlue,
                   ),
                 ),
+              ),
+            ),
+        ],
+        bottom: _bulkFilling
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(3),
+                child: LinearProgressIndicator(
+                  value: _bulkTotal > 0 ? _bulkDone / _bulkTotal : null,
+                  backgroundColor: AppTheme.boksBlueLight,
+                  valueColor: AlwaysStoppedAnimation(AppTheme.boksBlue),
+                  minHeight: 3,
+                ),
               )
-            : null,
+            : (widget.box.description != null &&
+                    widget.box.description!.isNotEmpty)
+                ? PreferredSize(
+                    preferredSize: const Size.fromHeight(26),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                          left: 16, right: 16, bottom: 8),
+                      child: Text(
+                        widget.box.description!,
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 13,
+                          color: AppTheme.textMid,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                : null,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -820,7 +1066,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   Color(0xFF1976D2),
                   Color(0xFF1976D2),
                 ],
-                stops: [0.0, 0.39, 0.39, 1.0],
+                stops: [0.0, 0.43, 0.43, 1.0],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
@@ -901,6 +1147,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
               id: item.id,
               name: item.name,
               photoPath: item.photoPath,
+              webPhoto: item.webPhoto,
               boxId: targetBox.id,
               createdAt: item.createdAt,
               labels: List.from(item.labels),
@@ -912,7 +1159,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                 ..clearSnackBars()
                 ..showSnackBar(SnackBar(
                   content: Text('"${item.name}" moved to ${targetBox.name}'),
-                  duration: const Duration(seconds: 3),
+                  duration: const Duration(milliseconds: 2500),
                 ));
             }
           },
@@ -1502,7 +1749,7 @@ class _ItemCard extends StatefulWidget {
   final VoidCallback onDelete;
   final VoidCallback onMove;
   final Widget Function(String? path,
-      {double height, bool editable, VoidCallback? onTap}) buildPhotoWidget;
+      {double height, bool editable, bool webPhoto, VoidCallback? onTap}) buildPhotoWidget;
 
   const _ItemCard({
     required this.item,
@@ -1581,7 +1828,7 @@ class _ItemCardState extends State<_ItemCard> {
                 height: 90,
                 child: hasPhoto
                     ? widget.buildPhotoWidget(widget.resolvedPhotoPath,
-                        height: 90)
+                        height: 90, webPhoto: widget.item.webPhoto)
                     : Container(
                         color: AppTheme.cardBg,
                         child: Icon(Icons.image_not_supported_outlined,
@@ -1975,6 +2222,51 @@ class _MoveToBoxSheetState extends State<_MoveToBoxSheet> {
 }
 
 // ── Label picker row (used in add/edit item dialogs) ────────────────────────────
+
+class _PhotoActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PhotoActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: kFontFamily,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _LabelPickerRow extends StatelessWidget {
   final List<ItemLabel> labels;

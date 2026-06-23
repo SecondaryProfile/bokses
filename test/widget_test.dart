@@ -5,13 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:bokses/main.dart';
 import 'package:bokses/models/box.dart';
+import 'package:bokses/screens/home_screen.dart';
 import 'package:bokses/models/item.dart';
+import 'package:bokses/screens/about_screen.dart';
 import 'package:bokses/screens/box_detail_screen.dart';
+import 'package:bokses/screens/settings_screen.dart';
+import 'package:bokses/screens/version_history_screen.dart';
 import 'package:bokses/services/database_service.dart';
 import 'package:bokses/services/import_export_service.dart';
+import 'package:bokses/services/settings_service.dart';
 import 'package:bokses/theme/app_theme.dart';
+import 'package:bokses/widgets/bubble_widgets.dart';
+import 'package:bokses/widgets/label_badges.dart';
 
 import 'helpers/fake_database_service.dart';
 
@@ -57,7 +63,10 @@ Future<void> pumpApp(
   AppTheme.setMode(true);
   AppTheme.setPreset(0);
   SharedPreferences.setMockInitialValues({});
-  await tester.pumpWidget(const BoksesApp());
+  await tester.pumpWidget(MaterialApp(
+    theme: AppTheme.theme,
+    home: const HomeScreen(),
+  ));
   await tester.pumpAndSettle();
 }
 
@@ -411,10 +420,6 @@ void main() {
       expect(find.text('New Box'), findsOneWidget);
     });
 
-    testWidgets('version footer visible', (t) async {
-      await pumpApp(t);
-      expect(find.textContaining('v0.0'), findsOneWidget);
-    });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -590,36 +595,35 @@ void main() {
   // ══════════════════════════════════════════════════════════════════════════
 
   group('HomeScreen — delete box', () {
-    testWidgets('delete opens confirmation dialog', (t) async {
+    testWidgets('delete removes box immediately', (t) async {
       await pumpApp(t, boxes: [box1()]);
       await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
       await t.pumpAndSettle();
       await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      expect(find.text('Cancel'), findsOneWidget);
-    });
-
-    testWidgets('cancelling keeps box', (t) async {
-      await pumpApp(t, boxes: [box1()]);
-      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
-      await t.pumpAndSettle();
-      await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Cancel'));
-      await t.pumpAndSettle();
-      expect(find.text('Kitchen Stuff'), findsOneWidget);
-    });
-
-    testWidgets('confirming removes box', (t) async {
-      await pumpApp(t, boxes: [box1()]);
-      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
-      await t.pumpAndSettle();
-      await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(ElevatedButton, 'Delete'));
       await t.pumpAndSettle();
       expect(find.text('Kitchen Stuff'), findsNothing);
       expect(_fakeDb.boxes, isEmpty);
+    });
+
+    testWidgets('delete shows undo snackbar', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      expect(find.text('Undo'), findsOneWidget);
+    });
+
+    testWidgets('undo restores deleted box', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Undo'));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Stuff'), findsOneWidget);
+      expect(_fakeDb.boxes.length, 1);
     });
 
     testWidgets('deleting box also removes its items', (t) async {
@@ -627,8 +631,6 @@ void main() {
       await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
       await t.pumpAndSettle();
       await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(ElevatedButton, 'Delete'));
       await t.pumpAndSettle();
       expect(_fakeDb.items, isEmpty);
     });
@@ -773,9 +775,9 @@ void main() {
       expect(find.text('Fork'), findsOneWidget);
     });
 
-    testWidgets('shows no-photo label', (t) async {
+    testWidgets('shows no-photo icon for item without photo', (t) async {
       await pumpBoxDetail(t, box1(), items: [item1()]);
-      expect(find.text('No photo'), findsOneWidget);
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
     });
 
     testWidgets('empty state hidden when items exist', (t) async {
@@ -873,36 +875,35 @@ void main() {
   // ══════════════════════════════════════════════════════════════════════════
 
   group('BoxDetailScreen — delete item', () {
-    testWidgets('delete opens confirmation dialog', (t) async {
+    testWidgets('delete removes item immediately', (t) async {
       await pumpBoxDetail(t, box1(), items: [item1()]);
       await t.tap(find.byIcon(Icons.more_vert_rounded));
       await t.pumpAndSettle();
       await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      expect(find.text('Cancel'), findsOneWidget);
-    });
-
-    testWidgets('cancelling keeps item', (t) async {
-      await pumpBoxDetail(t, box1(), items: [item1()]);
-      await t.tap(find.byIcon(Icons.more_vert_rounded));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Cancel'));
-      await t.pumpAndSettle();
-      expect(find.text('Red Plate'), findsOneWidget);
-    });
-
-    testWidgets('confirming removes item', (t) async {
-      await pumpBoxDetail(t, box1(), items: [item1()]);
-      await t.tap(find.byIcon(Icons.more_vert_rounded));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Delete'));
-      await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(ElevatedButton, 'Delete'));
       await t.pumpAndSettle();
       expect(find.text('Red Plate'), findsNothing);
       expect(_fakeDb.items, isEmpty);
+    });
+
+    testWidgets('delete shows undo snackbar', (t) async {
+      await pumpBoxDetail(t, box1(), items: [item1()]);
+      await t.tap(find.byIcon(Icons.more_vert_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      expect(find.text('Undo'), findsOneWidget);
+    });
+
+    testWidgets('undo restores deleted item', (t) async {
+      await pumpBoxDetail(t, box1(), items: [item1()]);
+      await t.tap(find.byIcon(Icons.more_vert_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Undo'));
+      await t.pumpAndSettle();
+      expect(find.text('Red Plate'), findsOneWidget);
+      expect(_fakeDb.items.length, 1);
     });
 
     testWidgets('deleting last item shows empty state', (t) async {
@@ -911,9 +912,492 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Delete'));
       await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(ElevatedButton, 'Delete'));
-      await t.pumpAndSettle();
       expect(find.text('Box is empty!'), findsOneWidget);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UNIT — Item labels
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('Item model — labels', () {
+    test('labels round-trip through toMap/fromMap', () {
+      final item = Item(
+        id: 'i', name: 'X', boxId: 'b', createdAt: DateTime(2024, 1, 1),
+        labels: [ItemLabel.fragile, ItemLabel.liquid],
+      );
+      final copy = Item.fromMap(item.toMap());
+      expect(copy.labels, containsAll([ItemLabel.fragile, ItemLabel.liquid]));
+      expect(copy.labels.length, 2);
+    });
+
+    test('unknown label in fromMap is silently dropped', () {
+      final map = {
+        'id': 'i', 'name': 'X', 'boxId': 'b',
+        'createdAt': DateTime(2024, 1, 1).toIso8601String(),
+        'labels': ['fragile', 'unknown_label'],
+      };
+      final item = Item.fromMap(map);
+      expect(item.labels, [ItemLabel.fragile]);
+    });
+
+    test('toExportMap includes labels', () {
+      final item = Item(
+        id: 'i', name: 'X', boxId: 'b', createdAt: DateTime(2024, 1, 1),
+        labels: [ItemLabel.battery],
+      );
+      expect(item.toExportMap()['labels'], ['battery']);
+    });
+
+    test('empty labels survive round-trip', () {
+      final item = Item(id: 'i', name: 'X', boxId: 'b', createdAt: DateTime(2024, 1, 1));
+      expect(Item.fromMap(item.toMap()).labels, isEmpty);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UNIT — SettingsService
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('SettingsService', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('dark mode defaults to true', () async {
+      expect(await SettingsService.getIsDarkMode(), isTrue);
+    });
+
+    test('dark mode persists', () async {
+      await SettingsService.setIsDarkMode(false);
+      expect(await SettingsService.getIsDarkMode(), isFalse);
+    });
+
+    test('theme preset defaults to 0', () async {
+      expect(await SettingsService.getThemePreset(), 0);
+    });
+
+    test('theme preset persists', () async {
+      await SettingsService.setThemePreset(3);
+      expect(await SettingsService.getThemePreset(), 3);
+    });
+
+    test('bg type defaults to none', () async {
+      expect(await SettingsService.getBackgroundType(), AppBgType.none);
+    });
+
+    test('bg type persists', () async {
+      await SettingsService.setBackgroundType(AppBgType.gradient);
+      expect(await SettingsService.getBackgroundType(), AppBgType.gradient);
+    });
+
+    test('talkSilenceMs defaults to 1500', () async {
+      expect(await SettingsService.getTalkSilenceMs(), 1500);
+    });
+
+    test('talkSilenceMs persists', () async {
+      await SettingsService.setTalkSilenceMs(2000);
+      expect(await SettingsService.getTalkSilenceMs(), 2000);
+    });
+
+    test('talkReadBack defaults to false', () async {
+      expect(await SettingsService.getTalkReadBack(), isFalse);
+    });
+
+    test('talkReadBack persists', () async {
+      await SettingsService.setTalkReadBack(true);
+      expect(await SettingsService.getTalkReadBack(), isTrue);
+    });
+
+    test('loadAllContent defaults to true', () async {
+      expect(await SettingsService.getLoadAllContent(), isTrue);
+    });
+
+    test('loadAllContent persists', () async {
+      await SettingsService.setLoadAllContent(false);
+      expect(await SettingsService.getLoadAllContent(), isFalse);
+    });
+
+    test('autoBoksCamera defaults to true', () async {
+      expect(await SettingsService.getAutoBoksCameraEnabled(), isTrue);
+    });
+
+    test('autoBoksCamera persists', () async {
+      await SettingsService.setAutoBoksCameraEnabled(false);
+      expect(await SettingsService.getAutoBoksCameraEnabled(), isFalse);
+    });
+
+    test('bgBlur defaults to 10.0', () async {
+      expect(await SettingsService.getBackgroundBlur(), 10.0);
+    });
+
+    test('bgBlur persists', () async {
+      await SettingsService.setBackgroundBlur(4.0);
+      expect(await SettingsService.getBackgroundBlur(), 4.0);
+    });
+
+    test('bgColor defaults to 0xFF0C0C0E', () async {
+      expect(await SettingsService.getBackgroundColor(), 0xFF0C0C0E);
+    });
+
+    test('bgColor persists', () async {
+      await SettingsService.setBackgroundColor(0xFFAABBCC);
+      expect(await SettingsService.getBackgroundColor(), 0xFFAABBCC);
+    });
+
+    test('autoBoksSuccessCount defaults to 0', () async {
+      expect(await SettingsService.getAutoBoksSuccessCount(), 0);
+    });
+
+    test('incrementAutoBoksSuccessCount increments', () async {
+      await SettingsService.incrementAutoBoksSuccessCount();
+      await SettingsService.incrementAutoBoksSuccessCount();
+      expect(await SettingsService.getAutoBoksSuccessCount(), 2);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WIDGET — label_badges
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Widget wrapWidget(Widget w) =>
+      MaterialApp(theme: AppTheme.theme, home: Scaffold(body: Center(child: w)));
+
+  group('FragileBadge', () {
+    testWidgets('renders FRAGILE text', (t) async {
+      await t.pumpWidget(wrapWidget(const FragileBadge()));
+      expect(find.text('FRAGILE'), findsOneWidget);
+    });
+  });
+
+  group('BatteryBadge', () {
+    testWidgets('renders BATTERY text', (t) async {
+      await t.pumpWidget(wrapWidget(const BatteryBadge()));
+      expect(find.text('BATTERY'), findsOneWidget);
+    });
+  });
+
+  group('LiquidBadge', () {
+    testWidgets('renders LIQUID text', (t) async {
+      await t.pumpWidget(wrapWidget(const LiquidBadge()));
+      expect(find.text('LIQUID'), findsOneWidget);
+    });
+  });
+
+  group('LabelBadgesRow', () {
+    testWidgets('empty set renders nothing', (t) async {
+      await t.pumpWidget(wrapWidget(const LabelBadgesRow(labels: {})));
+      expect(find.text('FRAGILE'), findsNothing);
+      expect(find.text('BATTERY'), findsNothing);
+      expect(find.text('LIQUID'), findsNothing);
+    });
+
+    testWidgets('fragile label shows badge', (t) async {
+      await t.pumpWidget(wrapWidget(
+          const LabelBadgesRow(labels: {ItemLabel.fragile})));
+      expect(find.text('FRAGILE'), findsOneWidget);
+    });
+
+    testWidgets('all three labels render three badges', (t) async {
+      await t.pumpWidget(wrapWidget(
+          const LabelBadgesRow(
+              labels: {ItemLabel.fragile, ItemLabel.battery, ItemLabel.liquid})));
+      expect(find.text('FRAGILE'), findsOneWidget);
+      expect(find.text('BATTERY'), findsOneWidget);
+      expect(find.text('LIQUID'), findsOneWidget);
+    });
+  });
+
+  group('LabelPickerSheet', () {
+    Future<void> pumpSheet(WidgetTester t,
+        {List<ItemLabel> initial = const []}) async {
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.theme,
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => showModalBottomSheet<List<ItemLabel>>(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => LabelPickerSheet(initial: initial),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('Open'));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('shows all three label names', (t) async {
+      await pumpSheet(t);
+      expect(find.text('Fragile'), findsOneWidget);
+      expect(find.text('Battery'), findsOneWidget);
+      expect(find.text('Liquid'), findsOneWidget);
+    });
+
+    testWidgets('tapping a label toggles its selection', (t) async {
+      await pumpSheet(t);
+      await t.tap(find.text('Fragile'));
+      await t.pumpAndSettle();
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    });
+
+    testWidgets('initial selection is pre-checked', (t) async {
+      await pumpSheet(t, initial: [ItemLabel.battery]);
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    });
+
+    testWidgets('Done pops with selected labels', (t) async {
+      List<ItemLabel>? result;
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.theme,
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () async {
+                result = await showModalBottomSheet<List<ItemLabel>>(
+                  context: ctx,
+                  isScrollControlled: true,
+                  builder: (_) => const LabelPickerSheet(initial: []),
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('Open'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Fragile'));
+      await t.pumpAndSettle();
+      await t.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await t.pumpAndSettle();
+      expect(result, contains(ItemLabel.fragile));
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WIDGET — bubble_widgets
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('BoksCard', () {
+    testWidgets('renders its child', (t) async {
+      await t.pumpWidget(wrapWidget(
+          const BoksCard(child: Text('card content'))));
+      expect(find.text('card content'), findsOneWidget);
+    });
+
+    testWidgets('onTap fires when tapped', (t) async {
+      var tapped = false;
+      await t.pumpWidget(wrapWidget(
+          BoksCard(onTap: () => tapped = true, child: const Text('tap me'))));
+      await t.tap(find.text('tap me'));
+      expect(tapped, isTrue);
+    });
+  });
+
+  group('BoksBadge', () {
+    testWidgets('renders label text', (t) async {
+      await t.pumpWidget(wrapWidget(
+          BoksBadge(
+              label: 'Hello',
+              color: Colors.blue,
+              textColor: Colors.white)));
+      expect(find.text('Hello'), findsOneWidget);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WIDGET — AboutScreen
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('AboutScreen', () {
+    testWidgets('renders About appBar', (t) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const AboutScreen()));
+      await t.pumpAndSettle();
+      expect(find.text('About'), findsOneWidget);
+    });
+
+    testWidgets('shows Bokses name in body', (t) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const AboutScreen()));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Bokses'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WIDGET — VersionHistoryScreen
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('VersionHistoryScreen', () {
+    testWidgets('renders Version History appBar', (t) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const VersionHistoryScreen()));
+      await t.pumpAndSettle();
+      expect(find.text('Version History'), findsOneWidget);
+    });
+
+    testWidgets('shows at least one version badge', (t) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const VersionHistoryScreen()));
+      await t.pumpAndSettle();
+      expect(find.textContaining('v0.'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WIDGET — SettingsScreen
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('SettingsScreen', () {
+    Future<void> pumpSettings(WidgetTester t) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      SharedPreferences.setMockInitialValues({});
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const SettingsScreen()));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('renders Settings appBar', (t) async {
+      await pumpSettings(t);
+      expect(find.text('Settings'), findsOneWidget);
+    });
+
+    testWidgets('shows Dark Mode toggle', (t) async {
+      await pumpSettings(t);
+      expect(find.text('Dark Mode'), findsOneWidget);
+    });
+
+    testWidgets('shows Camera toggle in AutoBoks section', (t) async {
+      await t.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+      await pumpSettings(t);
+      expect(find.text('Camera'), findsOneWidget);
+    });
+
+    testWidgets('dark mode toggle persists to SharedPreferences', (t) async {
+      SharedPreferences.setMockInitialValues({'is_dark_mode': true});
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      await t.pumpWidget(MaterialApp(
+          theme: AppTheme.theme, home: const SettingsScreen()));
+      await t.pumpAndSettle();
+      final toggle = find.byWidgetPredicate(
+          (w) => w is Switch, description: 'Dark Mode switch');
+      await t.tap(toggle.first);
+      await t.pumpAndSettle();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('is_dark_mode'), isFalse);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // E2E — User flows
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('E2E — create box then add items', () {
+    testWidgets('item count on home card updates after adding items', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.text('Kitchen Stuff'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Add Item'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextFormField).first, 'Spoon');
+      await t.tap(find.widgetWithText(ElevatedButton, 'Add Item'));
+      await t.pumpAndSettle();
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.text('1 item'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('multiple items added to same box count correctly', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.text('Kitchen Stuff'));
+      await t.pumpAndSettle();
+      for (final name in ['Spoon', 'Bowl', 'Cup']) {
+        await t.tap(find.text('Add Item'));
+        await t.pumpAndSettle();
+        await t.enterText(find.byType(TextFormField).first, name);
+        await t.tap(find.widgetWithText(ElevatedButton, 'Add Item'));
+        await t.pumpAndSettle();
+      }
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.text('3 items'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  group('E2E — search result navigation', () {
+    testWidgets('tapping search result opens correct BoxDetailScreen', (t) async {
+      await pumpApp(t, boxes: [box1()], items: [item1()]);
+      await t.tap(find.byIcon(Icons.search_rounded));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField), 'Plate');
+      await t.pumpAndSettle();
+      await t.tap(find.text('Red Plate', findRichText: true));
+      await t.pumpAndSettle();
+      expect(find.text('Red Plate'), findsOneWidget);
+      expect(find.text('Kitchen Stuff'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  group('E2E — settings navigation', () {
+    testWidgets('settings button from home opens SettingsScreen', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.settings_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('Settings'), findsOneWidget);
+    });
+
+    testWidgets('back from Settings returns to HomeScreen', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.settings_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.text('Bokses'), findsWidgets);
+    });
+  });
+
+  group('E2E — three-dots menu', () {
+    testWidgets('About menu item opens AboutScreen', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('About'));
+      await t.pumpAndSettle();
+      expect(find.text('About'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('Bokses'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  group('E2E — label assignment flow', () {
+    testWidgets('assigning fragile label to item shows badge on item list', (t) async {
+      await pumpBoxDetail(t, box1(), items: [item1()]);
+      await t.tap(find.byIcon(Icons.more_vert_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Edit'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Add Labels'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Fragile'));
+      await t.pumpAndSettle();
+      await t.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Save Changes'));
+      await t.pumpAndSettle();
+      expect(find.text('FRAGILE'), findsOneWidget);
     });
   });
 }

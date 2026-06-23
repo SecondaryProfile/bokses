@@ -4,6 +4,7 @@ class Item {
   final String id;
   String name;
   String? photoPath;
+  bool webPhoto;
   final String boxId;
   final DateTime createdAt;
   List<ItemLabel> labels;
@@ -12,6 +13,7 @@ class Item {
     required this.id,
     required this.name,
     this.photoPath,
+    this.webPhoto = false,
     required this.boxId,
     required this.createdAt,
     List<ItemLabel>? labels,
@@ -21,6 +23,7 @@ class Item {
         'id': id,
         'name': name,
         'photoPath': photoPath,
+        'webPhoto': webPhoto,
         'boxId': boxId,
         'createdAt': createdAt.toIso8601String(),
         'labels': labels.map((l) => l.name).toList(),
@@ -30,6 +33,7 @@ class Item {
         id: map['id'] as String,
         name: map['name'] as String,
         photoPath: map['photoPath'] as String?,
+        webPhoto: (map['webPhoto'] as bool?) ?? false,
         boxId: map['boxId'] as String,
         createdAt: DateTime.parse(map['createdAt'] as String),
         labels: ((map['labels'] as List<dynamic>?) ?? [])

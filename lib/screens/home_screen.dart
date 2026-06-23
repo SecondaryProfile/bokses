@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -41,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _animateSwitch = false;
   BoxSort _sort = BoxSort.dateAsc;
   BoxViewMode _viewMode = BoxViewMode.grid;
+
+  Timer? _snackTimer;
 
   bool _searching = false;
   final _searchCtrl = TextEditingController();
@@ -91,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AppTheme.bgNotifier.removeListener(_onBgChanged);
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
+    _snackTimer?.cancel();
     super.dispose();
   }
 
@@ -218,14 +222,12 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
-        padding:
-            EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(32)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Form(
             key: formKey,
@@ -253,16 +255,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 TextFormField(
                   controller: nameCtrl,
                   autofocus: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Box name *'),
+                  decoration: const InputDecoration(labelText: 'Box name *'),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return 'Name required';
                     }
                     final name = v.trim().toLowerCase();
-                    if (_boxes
-                        .any((b) => b.name.toLowerCase() == name)) {
+                    if (_boxes.any((b) => b.name.toLowerCase() == name)) {
                       return 'A box with this name already exists';
                     }
                     return null;
@@ -306,8 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _showEditBoxDialog(Box box) async {
     final nameCtrl = TextEditingController(text: box.name);
-    final descCtrl =
-        TextEditingController(text: box.description ?? '');
+    final descCtrl = TextEditingController(text: box.description ?? '');
     final formKey = GlobalKey<FormState>();
 
     await showModalBottomSheet(
@@ -315,14 +314,12 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
-        padding:
-            EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(32)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Form(
             key: formKey,
@@ -349,8 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: nameCtrl,
-                  decoration:
-                      const InputDecoration(labelText: 'Box name *'),
+                  decoration: const InputDecoration(labelText: 'Box name *'),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
@@ -358,8 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                     final name = v.trim().toLowerCase();
                     if (_boxes.any((b) =>
-                        b.id != box.id &&
-                        b.name.toLowerCase() == name)) {
+                        b.id != box.id && b.name.toLowerCase() == name)) {
                       return 'A box with this name already exists';
                     }
                     return null;
@@ -379,10 +374,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () async {
                       if (!formKey.currentState!.validate()) return;
                       box.name = nameCtrl.text.trim();
-                      box.description =
-                          descCtrl.text.trim().isEmpty
-                              ? null
-                              : descCtrl.text.trim();
+                      box.description = descCtrl.text.trim().isEmpty
+                          ? null
+                          : descCtrl.text.trim();
                       await DatabaseService.instance.updateBox(box);
                       if (ctx.mounted) Navigator.pop(ctx);
                       await _load();
@@ -413,31 +407,31 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     final itemWord = items.length == 1 ? 'item' : 'items';
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(
-        content: Text(
-          items.isEmpty
-              ? '"${box.name}" removed'
-              : '"${box.name}" and ${items.length} $itemWord removed',
-        ),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
-            await DatabaseService.instance.insertBox(box);
-            for (final item in items) {
-              await DatabaseService.instance.insertItem(item);
-            }
-            if (mounted) await _load();
-          },
-        ),
-      ));
+    _snackTimer?.cancel();
+    final messenger = ScaffoldMessenger.of(context)..clearSnackBars();
+    final ctrl = messenger.showSnackBar(SnackBar(
+      content: Text(
+        items.isEmpty
+            ? '"${box.name}" removed'
+            : '"${box.name}" and ${items.length} $itemWord removed',
+      ),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () async {
+          _snackTimer?.cancel();
+          await DatabaseService.instance.insertBox(box);
+          for (final item in items) {
+            await DatabaseService.instance.insertItem(item);
+          }
+          if (mounted) await _load();
+        },
+      ),
+    ));
+    _snackTimer = Timer(const Duration(milliseconds: 2500), ctrl.close);
   }
 
   Rect? _getMenuRect() {
-    final box =
-        _menuKey.currentContext?.findRenderObject() as RenderBox?;
+    final box = _menuKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return null;
     final pos = box.localToGlobal(Offset.zero);
     return pos & box.size;
@@ -449,8 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete all data?',
             style: TextStyle(
-                fontFamily: kFontFamily,
-                fontWeight: FontWeight.w800)),
+                fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
         content: const Text(
           'This will permanently delete all boxes and items. This cannot be undone.',
         ),
@@ -475,8 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _doExport() async {
     try {
-      await ImportExportService.exportData(
-          sharePositionOrigin: _getMenuRect());
+      await ImportExportService.exportData(sharePositionOrigin: _getMenuRect());
       _showSnack(kIsWeb ? 'Export downloaded!' : 'Export saved!');
     } catch (e) {
       _showSnack('Export failed: $e');
@@ -519,15 +511,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
     final _scaffold = Scaffold(
-      backgroundColor:
-          _hasCustomBg ? Colors.transparent : AppTheme.background,
+      backgroundColor: _hasCustomBg ? Colors.transparent : AppTheme.background,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -570,22 +560,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               )
-            : ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [AppTheme.boksBlue, AppTheme.boksRed],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ).createShader(bounds),
-                child: const Text(
-                  'Bokses',
-                  style: TextStyle(
-                    fontFamily: kFontFamily,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 30,
-                    letterSpacing: -0.5,
-                    color: Colors.white,
+            : Stack(
+                children: [
+                  Text(
+                    'Bokses',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 30,
+                      letterSpacing: -0.5,
+                      foreground: Paint()
+                        ..style = PaintingStyle.stroke
+                        ..strokeWidth = 4
+                        ..color = Colors.black.withValues(alpha: 0.28),
+                    ),
                   ),
-                ),
+                  ShaderMask(
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [AppTheme.boksBlue, AppTheme.boksRed],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      'Bokses',
+                      style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 30,
+                        letterSpacing: -0.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
         actions: _searching
             ? [
@@ -598,13 +605,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ]
             : [
                 Container(
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 8, horizontal: 8),
+                  margin:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                        color: AppTheme.bubblePurple, width: 1.5),
+                    border:
+                        Border.all(color: AppTheme.bubblePurple, width: 1.5),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -616,39 +623,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 16, vertical: 11),
-                          child:
-                              Icon(Icons.search_rounded, size: 23),
+                          child: Icon(Icons.search_rounded, size: 23),
                         ),
                       ),
                       Container(
-                        width: 1,
-                        height: 22,
-                        color: AppTheme.bubblePurple,
-                      ),
+                          width: 1, height: 22, color: AppTheme.bubblePurple),
                       PopupMenuButton<String>(
                         key: _menuKey,
                         padding: EdgeInsets.zero,
                         child: const Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 16, vertical: 11),
-                          child: Icon(Icons.more_horiz_rounded,
-                              size: 23),
+                          child: Icon(Icons.more_horiz_rounded, size: 23),
                         ),
                         onSelected: (val) async {
                           final nav = Navigator.of(context);
                           if (val == 'export') _doExport();
                           if (val == 'import') _doImport();
                           if (val == 'clear') _doClearAll();
-                          if (val == 'settings') {
-                            await nav.push(MaterialPageRoute(
-                                builder: (_) =>
-                                    const SettingsScreen()));
-                            _load();
-                          }
                           if (val == 'about') {
                             nav.push(MaterialPageRoute(
-                                builder: (_) =>
-                                    const AboutScreen()));
+                                builder: (_) => const AboutScreen()));
                           }
                         },
                         itemBuilder: (_) => [
@@ -659,8 +654,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: Text('Export Data',
                                   style: TextStyle(
                                       fontFamily: kFontFamily,
-                                      fontWeight:
-                                          FontWeight.w600)),
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -671,8 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: Text('Import Data',
                                   style: TextStyle(
                                       fontFamily: kFontFamily,
-                                      fontWeight:
-                                          FontWeight.w600)),
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -680,46 +673,44 @@ class _HomeScreenState extends State<HomeScreen> {
                           const PopupMenuItem(
                             value: 'clear',
                             child: ListTile(
-                              leading: Icon(
-                                  Icons.delete_sweep_rounded,
+                              leading: Icon(Icons.delete_sweep_rounded,
                                   color: Color(0xFFE53935)),
                               title: Text('Delete All Data',
                                   style: TextStyle(
                                       fontFamily: kFontFamily,
                                       color: Color(0xFFE53935),
-                                      fontWeight:
-                                          FontWeight.w600)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            value: 'settings',
-                            child: ListTile(
-                              leading:
-                                  Icon(Icons.settings_rounded),
-                              title: Text('Settings',
-                                  style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontWeight:
-                                          FontWeight.w600)),
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
                           const PopupMenuItem(
                             value: 'about',
                             child: ListTile(
-                              leading: Icon(
-                                  Icons.info_outline_rounded),
+                              leading: Icon(Icons.info_outline_rounded),
                               title: Text('About',
                                   style: TextStyle(
                                       fontFamily: kFontFamily,
-                                      fontWeight:
-                                          FontWeight.w600)),
+                                      fontWeight: FontWeight.w600)),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
                         ],
+                      ),
+                      Container(
+                          width: 1, height: 22, color: AppTheme.bubblePurple),
+                      InkWell(
+                        onTap: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => const SettingsScreen()));
+                          _load();
+                        },
+                        borderRadius: const BorderRadius.horizontal(
+                            right: Radius.circular(22)),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 11),
+                          child: Icon(Icons.settings_rounded, size: 23),
+                        ),
                       ),
                     ],
                   ),
@@ -742,13 +733,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               switchOutCurve: Curves.easeIn,
                               transitionBuilder: (child, animation) =>
                                   FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(
-                                      scale: Tween(begin: 0.95, end: 1.0)
-                                          .animate(animation),
-                                      child: child,
-                                    ),
-                                  ),
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween(begin: 0.95, end: 1.0)
+                                      .animate(animation),
+                                  child: child,
+                                ),
+                              ),
                               child: KeyedSubtree(
                                 key: ValueKey(_viewMode),
                                 child: _viewMode == BoxViewMode.grid
@@ -763,10 +754,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? null
           : _GradientFab(onPressed: _showAddBoxDialog)
               .animate()
-              .scale(
-                  delay: 300.ms,
-                  duration: 400.ms,
-                  curve: Curves.elasticOut),
+              .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
     );
     if (!_hasCustomBg) return _scaffold;
     return Stack(
@@ -784,8 +772,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_rounded,
-                size: 64, color: AppTheme.boksBlueLight),
+            Icon(Icons.search_rounded, size: 64, color: AppTheme.boksBlueLight),
             const SizedBox(height: 16),
             Text(
               'Type at least 3 characters',
@@ -804,8 +791,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_rounded,
-                size: 64, color: AppTheme.boksBlueLight),
+            Icon(Icons.inbox_rounded, size: 64, color: AppTheme.boksBlueLight),
             const SizedBox(height: 16),
             Text(
               'No items found',
@@ -852,8 +838,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) =>
-                            BoxDetailScreen(box: r.box)),
+                        builder: (_) => BoxDetailScreen(box: r.box)),
                   );
                 },
               );
@@ -872,8 +857,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _StatChip(
             icon: Icons.inventory_2_rounded,
-            label:
-                '${_boxes.length} box${_boxes.length == 1 ? '' : 'es'}',
+            label: '${_boxes.length} box${_boxes.length == 1 ? '' : 'es'}',
             color: AppTheme.boksBlueBright,
             bgColor: AppTheme.boksBlueLight,
           ),
@@ -897,8 +881,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 _viewMode = m;
                 _animateSwitch = true;
               });
-              Future.delayed(const Duration(milliseconds: 700),
-                  () { if (mounted) setState(() => _animateSwitch = false); });
+              Future.delayed(const Duration(milliseconds: 700), () {
+                if (mounted) setState(() => _animateSwitch = false);
+              });
             },
           ),
         ],
@@ -934,9 +919,7 @@ class _HomeScreenState extends State<HomeScreen> {
             'Tap the button below to create\nyour first box.',
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontFamily,
-                fontSize: 16,
-                color: AppTheme.textMid),
+                fontFamily: kFontFamily, fontSize: 16, color: AppTheme.textMid),
           ).animate().fadeIn(delay: 300.ms),
         ],
       ),
@@ -948,8 +931,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount:
-            MediaQuery.of(context).size.width > 700 ? 3 : 2,
+        crossAxisCount: MediaQuery.of(context).size.width > 700 ? 3 : 2,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
         childAspectRatio: 0.82,
@@ -972,8 +954,7 @@ class _HomeScreenState extends State<HomeScreen> {
             labels: labels,
             onTap: () async {
               ScaffoldMessenger.of(context).clearSnackBars();
-              final ro =
-                  key.currentContext?.findRenderObject() as RenderBox?;
+              final ro = key.currentContext?.findRenderObject() as RenderBox?;
               final rect = ro != null
                   ? ro.localToGlobal(Offset.zero) & ro.size
                   : Rect.zero;
@@ -1004,53 +985,55 @@ class _HomeScreenState extends State<HomeScreen> {
     final boxes = _sortedBoxes;
     return SlidableAutoCloseBehavior(
       child: ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-      itemCount: boxes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) {
-        final box = boxes[i];
-        final count = _itemCounts[box.id] ?? 0;
-        final labels = _boxLabels[box.id] ?? {};
-        final key = _listKeys.putIfAbsent(box.id, GlobalKey.new);
-        final t = boxes.length > 1 ? i / (boxes.length - 1) : 0.0;
-        final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
-        final tile = SizedBox(
-          key: key,
-          child: _BoxListTile(
-            box: box,
-            itemCount: count,
-            index: i,
-            totalBoxes: boxes.length,
-            labels: labels,
-            onTap: () async {
-              ScaffoldMessenger.of(context).clearSnackBars();
-              final ro =
-                  key.currentContext?.findRenderObject() as RenderBox?;
-              final rect = ro != null
-                  ? ro.localToGlobal(Offset.zero) & ro.size
-                  : Rect.zero;
-              await Navigator.push(
-                context,
-                _BoxOpenRoute(
-                    sourceRect: rect,
-                    page: BoxDetailScreen(box: box, accentColor: accentColor)),
-              );
-              _load();
-            },
-            onEdit: () => _showEditBoxDialog(box),
-            onDelete: () => _deleteBox(box),
-            onDeleteImmediate: () => _swipeDeleteBox(box),
-          ),
-        );
-        if (_loadAll && !_animateSwitch) return tile;
-        return tile
-            .animate()
-            .fadeIn(
-                delay: Duration(milliseconds: _animateSwitch ? 18 * i : 40 * i),
-                duration: _animateSwitch ? 180.ms : 200.ms)
-            .slideX(begin: _animateSwitch ? 0.03 : 0.04, end: 0);
-      },
-    ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+        itemCount: boxes.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) {
+          final box = boxes[i];
+          final count = _itemCounts[box.id] ?? 0;
+          final labels = _boxLabels[box.id] ?? {};
+          final key = _listKeys.putIfAbsent(box.id, GlobalKey.new);
+          final t = boxes.length > 1 ? i / (boxes.length - 1) : 0.0;
+          final accentColor =
+              Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+          final tile = SizedBox(
+            key: key,
+            child: _BoxListTile(
+              box: box,
+              itemCount: count,
+              index: i,
+              totalBoxes: boxes.length,
+              labels: labels,
+              onTap: () async {
+                ScaffoldMessenger.of(context).clearSnackBars();
+                final ro = key.currentContext?.findRenderObject() as RenderBox?;
+                final rect = ro != null
+                    ? ro.localToGlobal(Offset.zero) & ro.size
+                    : Rect.zero;
+                await Navigator.push(
+                  context,
+                  _BoxOpenRoute(
+                      sourceRect: rect,
+                      page:
+                          BoxDetailScreen(box: box, accentColor: accentColor)),
+                );
+                _load();
+              },
+              onEdit: () => _showEditBoxDialog(box),
+              onDelete: () => _deleteBox(box),
+              onDeleteImmediate: () => _swipeDeleteBox(box),
+            ),
+          );
+          if (_loadAll && !_animateSwitch) return tile;
+          return tile
+              .animate()
+              .fadeIn(
+                  delay:
+                      Duration(milliseconds: _animateSwitch ? 18 * i : 40 * i),
+                  duration: _animateSwitch ? 180.ms : 200.ms)
+              .slideX(begin: _animateSwitch ? 0.03 : 0.04, end: 0);
+        },
+      ),
     );
   }
 }
@@ -1076,19 +1059,16 @@ class _SortButton extends StatelessWidget {
       initialValue: sort,
       onSelected: onChanged,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.sort_rounded,
-                size: 14, color: AppTheme.textMid),
+            Icon(Icons.sort_rounded, size: 14, color: AppTheme.textMid),
             const SizedBox(width: 4),
             Text(
               _labels[sort]!,
@@ -1115,21 +1095,15 @@ class _SortButton extends StatelessWidget {
                         ? Icons.arrow_upward_rounded
                         : Icons.arrow_downward_rounded,
                 size: 16,
-                color: selected
-                    ? AppTheme.boksBlueBright
-                    : AppTheme.textMid,
+                color: selected ? AppTheme.boksBlueBright : AppTheme.textMid,
               ),
               const SizedBox(width: 8),
               Text(
                 _labels[s]!,
                 style: TextStyle(
                   fontFamily: kFontFamily,
-                  fontWeight: selected
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  color: selected
-                      ? AppTheme.boksBlueBright
-                      : AppTheme.textDark,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? AppTheme.boksBlueBright : AppTheme.textDark,
                 ),
               ),
             ],
@@ -1157,12 +1131,12 @@ class _ViewToggleButtonState extends State<_ViewToggleButton> {
 
   void _onTap() {
     if (!_enabled) return;
-    widget.onChanged(widget.mode == BoxViewMode.grid
-        ? BoxViewMode.list
-        : BoxViewMode.grid);
+    widget.onChanged(
+        widget.mode == BoxViewMode.grid ? BoxViewMode.list : BoxViewMode.grid);
     setState(() => _enabled = false);
-    Future.delayed(const Duration(milliseconds: 2500),
-        () { if (mounted) setState(() => _enabled = true); });
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) setState(() => _enabled = true);
+    });
   }
 
   @override
@@ -1209,7 +1183,8 @@ class _GradientFab extends StatelessWidget {
           end: Alignment.centerRight,
         ),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: AppTheme.boksBlue.withValues(alpha: 0.35),
@@ -1227,8 +1202,7 @@ class _GradientFab extends StatelessWidget {
           splashColor: Colors.white24,
           highlightColor: Colors.white10,
           child: const Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            padding: EdgeInsets.symmetric(horizontal: 22, vertical: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1278,12 +1252,11 @@ class _BoxCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = totalBoxes > 1 ? index / (totalBoxes - 1) : 0.0;
-    final accentColor =
-        Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
-    final accentDim = Color.lerp(
-        AppTheme.boksBlueLight, AppTheme.boksRedLight, t)!;
-    final accentBright = Color.lerp(
-        AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
+    final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+    final accentDim =
+        Color.lerp(AppTheme.boksBlueLight, AppTheme.boksRedLight, t)!;
+    final accentBright =
+        Color.lerp(AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
 
     return GestureDetector(
       onTap: onTap,
@@ -1291,7 +1264,7 @@ class _BoxCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accentColor, width: 3.0),
+          border: Border.all(color: accentColor, width: 7.0),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1358,12 +1331,10 @@ class _BoxCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(3, (row) {
                     return Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: List.generate(5, (col) {
                         final i = row * 5 + col;
-                        final isOverflowSlot =
-                            i == 14 && itemCount > 15;
+                        final isOverflowSlot = i == 14 && itemCount > 15;
                         final filled = i < itemCount;
                         if (isOverflowSlot) {
                           return Container(
@@ -1375,8 +1346,7 @@ class _BoxCard extends StatelessWidget {
                             ),
                             child: Center(
                               child: Icon(Icons.add,
-                                  size: 9,
-                                  color: AppTheme.background),
+                                  size: 9, color: AppTheme.background),
                             ),
                           );
                         }
@@ -1460,10 +1430,9 @@ class _BoxListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = totalBoxes > 1 ? index / (totalBoxes - 1) : 0.0;
-    final accentColor =
-        Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
-    final accentBright = Color.lerp(
-        AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
+    final accentColor = Color.lerp(AppTheme.boksBlue, AppTheme.boksRed, t)!;
+    final accentBright =
+        Color.lerp(AppTheme.boksBlueBright, AppTheme.boksRedBright, t)!;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -1495,75 +1464,75 @@ class _BoxListTile extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: accentColor, width: 3.0),
-                  ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(width: 5, color: accentColor),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  box.name,
-                                  style: TextStyle(
-                                    fontFamily: kFontFamily,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    color: accentColor,
-                                  ),
-                                ),
-                                if (box.description != null &&
-                                    box.description!.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    box.description!,
-                                    style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontSize: 12,
-                                      color: AppTheme.textMid,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                                if (labels.isNotEmpty) ...[
-                                  const SizedBox(height: 5),
-                                  LabelBadgesRow(labels: labels),
-                                ],
-                                const SizedBox(height: 3),
-                                Text(
-                                  '$itemCount item${itemCount == 1 ? '' : 's'}',
-                                  style: TextStyle(
-                                    fontFamily: kFontFamily,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: accentBright,
-                                  ),
-                                ),
-                              ],
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: accentColor, width: 7.0),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 5, color: accentColor),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              box.name,
+                              style: TextStyle(
+                                fontFamily: kFontFamily,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: accentColor,
+                              ),
                             ),
-                          ),
+                            if (box.description != null &&
+                                box.description!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                box.description!,
+                                style: TextStyle(
+                                  fontFamily: kFontFamily,
+                                  fontSize: 12,
+                                  color: AppTheme.textMid,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            if (labels.isNotEmpty) ...[
+                              const SizedBox(height: 5),
+                              LabelBadgesRow(labels: labels),
+                            ],
+                            const SizedBox(height: 3),
+                            Text(
+                              '$itemCount item${itemCount == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontFamily: kFontFamily,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: accentBright,
+                              ),
+                            ),
+                          ],
                         ),
-                        Icon(Icons.chevron_right_rounded,
-                            color: AppTheme.textMid, size: 20),
-                        const SizedBox(width: 12),
-                      ],
+                      ),
                     ),
-                  ),
+                    Icon(Icons.chevron_right_rounded,
+                        color: AppTheme.textMid, size: 20),
+                    const SizedBox(width: 12),
+                  ],
                 ),
               ),
+            ),
+          ),
         ),
       ),
-  );
+    );
   }
 }
 
@@ -1585,8 +1554,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
@@ -1636,13 +1604,11 @@ class _ResultTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-              color: AppTheme.bubblePurple, width: 1.5),
+          border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
         ),
         child: Row(
           children: [
@@ -1653,8 +1619,8 @@ class _ResultTile extends StatelessWidget {
                 color: AppTheme.boksBlueLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.label_rounded,
-                  color: AppTheme.boksBlue, size: 20),
+              child:
+                  Icon(Icons.label_rounded, color: AppTheme.boksBlue, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1676,8 +1642,7 @@ class _ResultTile extends StatelessWidget {
                   Row(
                     children: [
                       Icon(Icons.inventory_2_rounded,
-                          size: 12,
-                          color: AppTheme.textMid),
+                          size: 12, color: AppTheme.textMid),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -1693,8 +1658,7 @@ class _ResultTile extends StatelessWidget {
                       ),
                       if (item.labels.isNotEmpty) ...[
                         const SizedBox(width: 6),
-                        LabelBadgesRow(
-                            labels: item.labels.toSet()),
+                        LabelBadgesRow(labels: item.labels.toSet()),
                       ],
                     ],
                   ),
@@ -1710,9 +1674,7 @@ class _ResultTile extends StatelessWidget {
     if (loadAll) return tile;
     return tile
         .animate()
-        .fadeIn(
-            delay: Duration(milliseconds: 40 * index),
-            duration: 200.ms)
+        .fadeIn(delay: Duration(milliseconds: 40 * index), duration: 200.ms)
         .slideX(begin: 0.05, end: 0);
   }
 }
@@ -1748,8 +1710,7 @@ class _HighlightedText extends StatelessWidget {
             text: text.substring(idx, idx + query.length),
             style: style.copyWith(
               color: highlightColor,
-              backgroundColor:
-                  highlightColor.withValues(alpha: 0.15),
+              backgroundColor: highlightColor.withValues(alpha: 0.15),
             ),
           ),
           if (idx + query.length < text.length)
@@ -1769,8 +1730,7 @@ class _ImportProgressDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: AppTheme.surface,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
@@ -1806,9 +1766,7 @@ class _ImportProgressDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  total > 0
-                      ? '$done of $total records'
-                      : 'Please wait',
+                  total > 0 ? '$done of $total records' : 'Please wait',
                   style: TextStyle(
                     fontFamily: kFontFamily,
                     fontSize: 13,
@@ -1822,8 +1780,7 @@ class _ImportProgressDialog extends StatelessWidget {
                     value: frac,
                     minHeight: 8,
                     backgroundColor: AppTheme.boksBlueLight,
-                    valueColor:
-                        AlwaysStoppedAnimation(AppTheme.boksBlue),
+                    valueColor: AlwaysStoppedAnimation(AppTheme.boksBlue),
                   ),
                 ),
               ],
@@ -1895,4 +1852,3 @@ class _BoxOpenRoute extends PageRouteBuilder {
           },
         );
 }
-

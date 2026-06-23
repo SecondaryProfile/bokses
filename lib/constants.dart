@@ -1,9 +1,26 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.1.4';
+const String kAppVersion = '0.10';
 
 const kChangelog = [
   (
-    version: '0.1.4',
+    version: '0.10',
+    date: '2026-06-23',
+    changes: [
+      'Four-tier AI model hub — Small (MobileNet V3 Large), Medium (EfficientNet-Lite4), Large (ViT-B/16), XL (OpenCLIP ViT-L/14) — downloadable on demand from Settings',
+      'ONNX Runtime support alongside TFLite — Large and XL models run via on-device ONNX inference',
+      'Internet image search — find and set item photos from the web in the add or edit item dialog',
+      'Bulk photo fill — one button in a box fills all photo-less items from a web image search',
+      'Web-sourced photos marked with a globe badge to distinguish them from camera captures',
+      'SysML v2 architecture model documenting the full Bokses system and formal requirements',
+      'Refreshed app icon across all Android screen densities',
+      'Bokses wordmark on the home screen now has an outline visible on any background or theme',
+      'Box card border thickness unified — grid cards now match list tiles',
+      'Edit item dialog redesigned: full-width photo area, Camera / Find online / Remove action row, labels in their own bordered section',
+      'View mode toggle re-enable time reduced from 2.5 s to 1 s',
+    ],
+  ),
+  (
+    version: '0.9',
     date: '2026-06-22',
     changes: [
       'Swipe right on items to reveal a yellow Move button — moves the item to another box via a centered popup',
@@ -18,7 +35,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.1.3',
+    version: '0.8',
     date: '2026-06-19',
     changes: [
       'AutoBoks — hands-free voice-to-item mode with automatic photo capture; say an item name, a ding fires after the silence window, and the back camera takes a photo automatically',
@@ -35,7 +52,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.1.2',
+    version: '0.7',
     date: '2026-06-19',
     changes: [
       'BoksTalk — voice-to-item mode; speak an item name and it auto-adds after silence',
@@ -46,7 +63,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.1.1',
+    version: '0.6',
     date: '2026-06-18',
     changes: [
       'Box sorting — date (oldest/newest) and name (A–Z / Z–A)',
@@ -56,7 +73,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.1.0',
+    version: '0.5',
     date: '2026-06-18',
     changes: [
       'Android and iOS support',
@@ -65,7 +82,17 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.0.22',
+    version: '0.4',
+    date: '2026-06-11',
+    changes: [
+      'Comprehensive widget and unit test suite (89 tests)',
+      'Model round-trip tests, FakeDatabaseService CRUD and search tests',
+      'ImportExportService export payload and import round-trip tests',
+      'HomeScreen and BoxDetailScreen widget tests',
+    ],
+  ),
+  (
+    version: '0.3',
     date: '2026-06-11',
     changes: [
       'Loading fix — API errors no longer hang the spinner',
@@ -73,7 +100,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.0.21',
+    version: '0.2',
     date: '2026-06-11',
     changes: [
       'Version footer with changelog tooltip and full history page',
@@ -83,7 +110,7 @@ const kChangelog = [
     ],
   ),
   (
-    version: '0.0.20',
+    version: '0.1',
     date: '2026-06-11',
     changes: [
       'Initial versioned release',

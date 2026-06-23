@@ -1,0 +1,105 @@
+{
+  "shapes": [
+    {
+      "type": "square",
+      "start_x": 64,
+      "start_y": 64,
+      "end_x": 448,
+      "end_y": 432,
+      "rotation": 0,
+      "stroke_width": 30,
+      "stroke_color": "#1a1a1a",
+      "corner_radius": 0,
+      "points": [],
+      "curves": [],
+      "closed": false,
+      "text": "",
+      "font_family": "Trebuchet MS",
+      "font_size": 24,
+      "opacity": 1,
+      "filled": false,
+      "id": "pbs0ofu5drp"
+    },
+    {
+      "type": "square",
+      "start_x": 160,
+      "start_y": 112,
+      "end_x": 192,
+      "end_y": 288,
+      "rotation": 0,
+      "stroke_width": 30,
+      "stroke_color": "#1a1a1a",
+      "corner_radius": 0,
+      "points": [],
+      "curves": [],
+      "closed": false,
+      "text": "",
+      "font_family": "Trebuchet MS",
+      "font_size": 24,
+      "opacity": 1,
+      "filled": false,
+      "id": "w58lkni1tvn"
+    },
+    {
+      "type": "square",
+      "start_x": 368,
+      "start_y": 128,
+      "end_x": 400,
+      "end_y": 288,
+      "rotation": 0,
+      "stroke_width": 30,
+      "stroke_color": "#1a1a1a",
+      "corner_radius": 0,
+      "points": [],
+      "curves": [],
+      "closed": false,
+      "text": "",
+      "font_family": "Trebuchet MS",
+      "font_size": 24,
+      "opacity": 1,
+      "filled": false,
+      "id": "l5t1a4wsa1"
+    },
+    {
+      "type": "path",
+      "start_x": 128,
+      "start_y": 336,
+      "end_x": 416,
+      "end_y": 336,
+      "rotation": 0,
+      "stroke_width": 30,
+      "stroke_color": "#1a1a1a",
+      "corner_radius": 0,
+      "points": [
+        [
+          128,
+          336
+        ],
+        [
+          416,
+          336
+        ],
+        [
+          416,
+          336
+        ]
+      ],
+      "curves": [
+        87,
+        0,
+        -80
+      ],
+      "closed": true,
+      "text": "",
+      "font_family": "Trebuchet MS",
+      "font_size": 24,
+      "opacity": 1,
+      "filled": false,
+      "id": "v90x1l2n11f"
+    }
+  ],
+  "palette": "Ink",
+  "show_background": false,
+  "canvas_w": 512,
+  "canvas_h": 512
+}
