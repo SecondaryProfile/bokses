@@ -24,8 +24,20 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Test
-        run: flutter test --reporter=github
+      - name: Test with coverage
+        # Fails on any test failure, or if total line coverage drops below
+        # MIN_COVERAGE. Raise the floor as coverage improves.
+        env:
+          MIN_COVERAGE: 55
+        run: bash tool/coverage.sh --reporter=github
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
 
       - name: Build web
         run: flutter build web --release

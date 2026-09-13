@@ -55,8 +55,20 @@ key scoped to this purpose.
 ## Tests
 
 ```sh
-flutter test
+tool/coverage.sh                     # all tests + per-file coverage report
+MIN_COVERAGE=55 tool/coverage.sh     # same, failing below 55% (what CI does)
 ```
+
+`test/widget_test.dart` covers models, screens and user flows against an
+in-memory `FakeDatabaseService`. `test/services/` covers the real
+SharedPreferences-backed `DatabaseService` and the AI provider stack
+(`VisionService`, `SecureKeyStore`, `AiVisionSettingsService`) with HTTP
+answered by a `MockClient` — no network access or real API keys needed.
+
+If the project lives on an exFAT/FAT drive, pass test files explicitly
+(`flutter test test/widget_test.dart`) or use `tool/coverage.sh`: macOS writes
+a `._*_test.dart` file beside each test there, and `flutter test` hangs trying
+to load it.
 
 Tests run on the Dart VM rather than in a browser, which is why the download
 helper is split across `lib/services/web_download.dart` (VM stub) and

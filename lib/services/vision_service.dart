@@ -74,7 +74,13 @@ class VisionService {
       throw Exception('Unsupported image source: $imagePath');
     }
 
-    final decoded = img.decodeImage(raw);
+    img.Image? decoded;
+    try {
+      decoded = img.decodeImage(raw);
+    } catch (_) {
+      // The image package throws (rather than returning null) on some
+      // malformed input.
+    }
     if (decoded == null) throw Exception('Failed to decode image.');
 
     const maxDim = 768;
@@ -93,13 +99,18 @@ class VisionService {
     String apiKey,
   ) async {
     const def = kGeminiProvider;
+    // The key goes in a header, never the query string: a URL ends up in
+    // ClientException messages, and those are written to the debug log.
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/${def.model}:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/${def.model}:generateContent',
     );
     final resp = await http
         .post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
           body: jsonEncode({
             'contents': [
               {
@@ -122,7 +133,7 @@ class VisionService {
     _checkResponse(resp, def.displayName);
 
     final data = jsonDecode(resp.body);
-    final candidate = data['candidates']?[0];
+    final candidate = _first(data['candidates']);
     final text = candidate?['content']?['parts']?[0]?['text'] as String?;
     if (text == null) {
       final finishReason = candidate?['finishReason'];
@@ -217,10 +228,15 @@ class VisionService {
     _checkResponse(resp, def.displayName);
 
     final data = jsonDecode(resp.body);
-    final text = data['choices']?[0]?['message']?['content'] as String?;
+    final text = _first(data['choices'])?['message']?['content'] as String?;
     if (text == null) throw Exception('${def.displayName} returned no result.');
     return _parseGuesses(text);
   }
+
+  /// First element of a JSON list, or null if it is missing or empty —
+  /// `list?[0]` alone throws a RangeError on an empty list.
+  static dynamic _first(Object? list) =>
+      (list is List && list.isNotEmpty) ? list.first : null;
 
   static void _logResponse(String providerName, http.Response resp) {
     const maxLen = 4000;
