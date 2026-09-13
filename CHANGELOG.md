@@ -1,19 +1,50 @@
 # Bokses — Changelog
 
+## 0.12 — 2026-09-13
+
+### Added
+- **AI Provider** replaces the Model Hub — connect your own Gemini, Claude, or
+  ChatGPT API key for image recognition instead of downloading on-device models.
+  Requests go straight from the browser to the chosen provider over HTTPS; no
+  Bokses server is involved.
+- Debug log screen for troubleshooting
+
+### Changed
+- **Bokses is now a web-only app.** The Android, iOS, macOS, Windows and Linux
+  targets are gone; the only build output is `flutter build web`, intended to be
+  served from a container.
+- API keys are now encrypted at rest in browser storage rather than the iOS
+  Keychain / Android Keystore — private to the browser profile, not the device
+- Export downloads a JSON file from the browser instead of writing to the file
+  system or invoking a share sheet; web-sourced photo URLs now survive an
+  export/import round trip
+- Debug log is an in-memory rolling buffer for the session, downloadable as a
+  `.txt`, instead of a file on disk
+
+### Removed
+- On-device ONNX model hub, model downloads, and the Small / Medium / Large / XL
+  tiers
+- SysML v2 architecture model (`bokses_architecture.sysml`), the generated
+  `requirements.csv` / `requirements.xls`, and `tools/extract_requirements.py`
+- Native-only dependencies: `path_provider`, `permission_handler`,
+  `share_plus`, `flutter_launcher_icons`, plus the unused `path` and
+  `cupertino_icons`. Camera permission is now the browser's own
+  `getUserMedia` prompt.
+
+---
+
 ## 0.10 — 2026-06-23
 
 ### Added
 - **AI model hub** — four downloadable tiers, selectable in Settings:
-  - Small: MobileNet V3 Large (TFLite, ~22 MB)
-  - Medium: EfficientNet-Lite4 (TFLite, ~49 MB)
+  - Small: MobileNet V3 Large (~22 MB)
+  - Medium: EfficientNet-Lite4 (~49 MB)
   - Large: ViT-B/16 (ONNX, ~335 MB)
   - XL: OpenCLIP ViT-L/14 (ONNX, ~900 MB)
-- ONNX Runtime on Android — Large and XL models run via on-device ONNX inference alongside the existing TFLite path
+- ONNX Runtime support alongside TFLite — Large and XL models run via on-device ONNX inference
 - **Internet image search** — "Find online" button in add/edit item dialogs searches DuckDuckGo Images and shows a thumbnail grid; tap to set as the item photo (no API key, no account required)
 - **Bulk photo fill** — `image_search` button in a box's app bar finds web photos for every item that has none, with a confirmation dialog before proceeding; progress shown in the app bar
 - Globe badge on web-sourced photos to distinguish them from camera captures
-- **SysML v2 architecture model** (`bokses_architecture.sysml`) documenting the full system, services, state machines, and formal requirements with verification traceability
-- Requirements extraction tool (`tools/extract_requirements.py`) — exports all SysML requirements to CSV and HTML
 
 ### Changed
 - Refreshed app icon across all Android screen densities (smaller, cleaner artwork)

@@ -3,11 +3,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/settings_service.dart';
-import '../services/model_service.dart';
+import '../services/ai_vision_settings_service.dart';
+import '../models/ai_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
-import '../models/cv_model_def.dart';
-import 'model_hub_screen.dart';
+import 'ai_provider_screen.dart';
+import 'debug_log_screen.dart';
 import 'version_history_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -35,8 +36,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Computer Vision
   bool _cvEnabled = false;
-  bool _modelInstalled = false;
-  CvModelTier? _activeCvTier;
+  bool _hasAiKey = false;
+  AiProvider? _activeAiProvider;
 
   // Performance
   bool _loadAll = true;
@@ -59,9 +60,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final autoBoksCamera = await SettingsService.getAutoBoksCameraEnabled();
     final cv = await SettingsService.getCvEnabled();
     final loadAll = await SettingsService.getLoadAllContent();
-    final activeTier = await ModelService.activeTier();
-    final installed =
-        activeTier != null ? await ModelService.isInstalled(activeTier) : false;
+    final activeProvider = await AiVisionSettingsService.activeProvider();
+    final hasKey = await AiVisionSettingsService.isConfigured();
     if (!mounted) return;
 
     Uint8List? bgImage;
@@ -83,8 +83,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _autoBoksCamera = autoBoksCamera;
       _cvEnabled = cv;
       _loadAll = loadAll;
-      _modelInstalled = installed;
-      _activeCvTier = activeTier;
+      _hasAiKey = hasKey;
+      _activeAiProvider = activeProvider;
     });
   }
 
@@ -502,33 +502,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.auto_awesome_rounded,
               iconColor: AppTheme.boksBlue,
               iconBg: AppTheme.boksBlueLight,
-              title: 'Model Hub',
-              subtitle: _activeCvTierLabel(),
+              title: 'AI Provider',
+              subtitle: _activeProviderLabel(),
               trailing: Icon(Icons.chevron_right_rounded, color: AppTheme.textMid),
               onTap: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ModelHubScreen()),
+                  MaterialPageRoute(builder: (_) => const AiProviderScreen()),
                 );
-                final tier = await ModelService.activeTier();
-                final installed =
-                    tier != null ? await ModelService.isInstalled(tier) : false;
+                final provider = await AiVisionSettingsService.activeProvider();
+                final hasKey = await AiVisionSettingsService.isConfigured();
                 if (mounted) {
                   setState(() {
-                    _modelInstalled = installed;
-                    _activeCvTier = tier;
+                    _hasAiKey = hasKey;
+                    _activeAiProvider = provider;
                   });
                 }
               },
             ),
-            if (_modelInstalled) ...[
+            if (_hasAiKey) ...[
               _groupDivider(),
               _settingsTile(
                 icon: Icons.memory_rounded,
                 iconColor: AppTheme.boksBlue,
                 iconBg: AppTheme.boksBlueLight,
-                title: 'Enable Computer Vision',
-                subtitle: 'Suggest item names from photos using on-device AI',
+                title: 'Enable AI Recognition',
+                subtitle: 'Suggest item names from photos using your connected AI',
                 trailing: Switch(
                   value: _cvEnabled,
                   activeThumbColor: AppTheme.boksBlue,
@@ -554,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _StepRow(
                         icon: Icons.auto_awesome_rounded,
                         isPrimary: false,
-                        text: 'On-device AI analyses the image instantly',
+                        text: 'Your AI assistant analyses it over an encrypted connection',
                       ),
                       const SizedBox(height: 10),
                       _StepRow(
@@ -567,6 +566,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ],
+          ]),
+          const SizedBox(height: 28),
+
+          // ── DIAGNOSTICS ─────────────────────────────────────────────────────────
+          _sectionLabel('DIAGNOSTICS'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.bug_report_outlined,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Debug Log',
+              subtitle: 'View and share console output for troubleshooting',
+              trailing: Icon(Icons.chevron_right_rounded, color: AppTheme.textMid),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DebugLogScreen()),
+              ),
+            ),
           ]),
           const SizedBox(height: 40),
 
@@ -594,10 +611,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  String _activeCvTierLabel() {
-    if (_activeCvTier == null) return 'No model installed';
-    final def = kCvModels.firstWhere((m) => m.tier == _activeCvTier!);
-    return '${def.modelName} (${def.displayName})';
+  String _activeProviderLabel() {
+    if (_activeAiProvider == null) return 'No AI provider connected';
+    final def = aiProviderDef(_activeAiProvider!);
+    return '${def.displayName} connected';
   }
 
   Widget _sectionLabel(String title) {

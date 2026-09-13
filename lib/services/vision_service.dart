@@ -1,318 +1,277 @@
-import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:math' as math;
+import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:onnxruntime/onnxruntime.dart';
-import '../models/cv_model_def.dart';
-import 'model_service.dart';
+import '../models/ai_provider.dart';
+import 'ai_vision_settings_service.dart';
+import 'app_logger.dart';
+import 'secure_key_store.dart';
 
+const _kLogTag = 'VisionService';
+
+const _kPrompt =
+    'You are looking at a single item photographed for a home inventory app. '
+    'Identify what the item is. Respond with ONLY a JSON array of up to 5 short, '
+    'specific guesses for the item name, ordered from most to least likely, e.g. '
+    '["cordless drill","power drill","impact driver","electric screwdriver","tool"]. '
+    'No other text, no markdown, no explanation.';
+
+/// Sends a photo directly to the user's own AI provider (Gemini, Claude, or
+/// ChatGPT) over HTTPS to identify the item. No Bokses server is involved —
+/// this is a direct, encrypted, device-to-provider connection made only when
+/// the user taps to identify an item. The API key is read from
+/// [SecureKeyStore] (encrypted browser storage) and never logged.
 class VisionService {
-  static Interpreter? _tfliteInterpreter;
-  static OrtSession? _ortSession;
-  static bool _ortEnvInitialized = false;
-  static List<String>? _labels;
-  static Float32List? _textEmbeddings;
-  static int? _embedDim;
-  static CvModelTier? _loadedTier;
-
-  static Future<bool> isAvailable() async {
-    final tier = await ModelService.activeTier();
-    if (tier == null) return false;
-    return ModelService.isInstalled(tier);
-  }
-
-  static Future<void> _load() async {
-    final tier = await ModelService.activeTier();
-    if (tier == null) throw Exception('No active CV model tier.');
-    final installed = await ModelService.isInstalled(tier);
-    if (!installed) throw Exception('Active CV model is not installed.');
-
-    if (_loadedTier == tier &&
-        ((_tfliteInterpreter != null) || (_ortSession != null))) {
-      return;
-    }
-
-    _disposeCurrentModel();
-
-    final def = kCvModels.firstWhere((m) => m.tier == tier);
-    final modelPath = (await ModelService.installedModelPath(tier))!;
-    final labelsPath = (await ModelService.installedLabelsPath(tier))!;
-
-    final labelsRaw = await File(labelsPath).readAsString();
-    _labels = labelsRaw
-        .split('\n')
-        .map((l) => l.trim())
-        .toList();
-
-    if (def.isTflite) {
-      _tfliteInterpreter = Interpreter.fromFile(File(modelPath));
-    } else {
-      _ensureOrtEnv();
-      final sessionOptions = OrtSessionOptions();
-      _ortSession = OrtSession.fromFile(File(modelPath), sessionOptions);
-      sessionOptions.release();
-    }
-
-    if (def.isZeroShot) {
-      final embPath = (await ModelService.installedEmbeddingsPath(tier))!;
-      final bytes = await File(embPath).readAsBytes();
-      final byteData = bytes.buffer.asByteData();
-      final numClasses = byteData.getInt32(0, Endian.little);
-      final embedDim = byteData.getInt32(4, Endian.little);
-      _embedDim = embedDim;
-      _textEmbeddings = Float32List(numClasses * embedDim);
-      for (int i = 0; i < numClasses * embedDim; i++) {
-        _textEmbeddings![i] = byteData.getFloat32(8 + i * 4, Endian.little);
-      }
-    }
-
-    _loadedTier = tier;
-  }
+  static Future<bool> isAvailable() => AiVisionSettingsService.isConfigured();
 
   static Future<List<String>> identifyItem({required String imagePath}) async {
-    await _load();
-    final def = kCvModels.firstWhere((m) => m.tier == _loadedTier!);
+    final provider = await AiVisionSettingsService.activeProvider();
+    if (provider == null) {
+      AppLogger.log(_kLogTag, 'identifyItem aborted: no active provider set.');
+      throw Exception(
+        'No AI provider configured. Add an API key in Settings > AI Provider.',
+      );
+    }
+    final def = aiProviderDef(provider);
+    final apiKey = await SecureKeyStore.getKey(provider);
+    if (apiKey == null || apiKey.isEmpty) {
+      AppLogger.log(_kLogTag, 'identifyItem aborted: no key saved for ${def.displayName}.');
+      throw Exception('No API key saved for ${def.displayName}.');
+    }
 
-    Uint8List bytes;
+    AppLogger.log(_kLogTag, 'identifyItem start — provider=${def.displayName} model=${def.model}');
+
+    try {
+      final imageBytes = await _loadAndCompressImage(imagePath);
+      final base64Image = base64Encode(imageBytes);
+      AppLogger.log(_kLogTag, 'image compressed — ${imageBytes.length} bytes, base64 len=${base64Image.length}');
+
+      final guesses = switch (provider) {
+        AiProvider.gemini => await _identifyGemini(base64Image, apiKey),
+        AiProvider.claude => await _identifyClaude(base64Image, apiKey),
+        AiProvider.openai => await _identifyOpenAi(base64Image, apiKey),
+      };
+
+      AppLogger.log(_kLogTag, 'identifyItem success — guesses=$guesses');
+      return guesses;
+    } catch (e, st) {
+      AppLogger.logError(_kLogTag, 'identifyItem failed (${def.displayName}): $e', st);
+      rethrow;
+    }
+  }
+
+  /// Downscales/compresses before upload so as little data as possible
+  /// leaves the device — smaller payload, faster request, lower cost.
+  static Future<Uint8List> _loadAndCompressImage(String imagePath) async {
+    Uint8List raw;
     if (imagePath.startsWith('data:')) {
       final comma = imagePath.indexOf(',');
-      bytes = base64Decode(imagePath.substring(comma + 1));
+      raw = base64Decode(imagePath.substring(comma + 1));
+    } else if (imagePath.startsWith('http') || imagePath.startsWith('blob:')) {
+      // Web-search results and in-browser captures are URLs, not bytes.
+      raw = await http.readBytes(Uri.parse(imagePath));
     } else {
-      bytes = await File(imagePath).readAsBytes();
+      throw Exception('Unsupported image source: $imagePath');
     }
 
-    final decoded = img.decodeImage(bytes);
+    final decoded = img.decodeImage(raw);
     if (decoded == null) throw Exception('Failed to decode image.');
-    final resized = img.copyResize(
-      decoded,
-      width: def.inputSize,
-      height: def.inputSize,
+
+    const maxDim = 768;
+    img.Image resized = decoded;
+    if (decoded.width > maxDim || decoded.height > maxDim) {
+      resized = decoded.width >= decoded.height
+          ? img.copyResize(decoded, width: maxDim)
+          : img.copyResize(decoded, height: maxDim);
+    }
+
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 82));
+  }
+
+  static Future<List<String>> _identifyGemini(
+    String base64Image,
+    String apiKey,
+  ) async {
+    const def = kGeminiProvider;
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/${def.model}:generateContent?key=$apiKey',
     );
+    final resp = await http
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': _kPrompt},
+                  {
+                    'inline_data': {
+                      'mime_type': 'image/jpeg',
+                      'data': base64Image,
+                    },
+                  },
+                ],
+              },
+            ],
+            'generationConfig': {'temperature': 0.2},
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    _logResponse(def.displayName, resp);
+    _checkResponse(resp, def.displayName);
 
-    if (def.isTflite) {
-      return _runTflite(def, resized);
-    } else {
-      return _runOnnx(def, resized);
+    final data = jsonDecode(resp.body);
+    final candidate = data['candidates']?[0];
+    final text = candidate?['content']?['parts']?[0]?['text'] as String?;
+    if (text == null) {
+      final finishReason = candidate?['finishReason'];
+      throw Exception(
+        '${def.displayName} returned no result'
+        '${finishReason != null ? ' (finishReason: $finishReason)' : ''}.',
+      );
     }
+    return _parseGuesses(text);
   }
 
-  static List<String> _runTflite(CvModelDef def, img.Image resized) {
-    final inputShape = _tfliteInterpreter!.getInputTensor(0).shape;
-    final h = inputShape[1];
-    final w = inputShape[2];
+  static Future<List<String>> _identifyClaude(
+    String base64Image,
+    String apiKey,
+  ) async {
+    const def = kClaudeProvider;
+    final uri = Uri.parse('https://api.anthropic.com/v1/messages');
+    final resp = await http
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: jsonEncode({
+            'model': def.model,
+            'max_tokens': 256,
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'type': 'image',
+                    'source': {
+                      'type': 'base64',
+                      'media_type': 'image/jpeg',
+                      'data': base64Image,
+                    },
+                  },
+                  {'type': 'text', 'text': _kPrompt},
+                ],
+              },
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    _logResponse(def.displayName, resp);
+    _checkResponse(resp, def.displayName);
 
-    final inputBytes = Uint8List(1 * h * w * 3);
-    int idx = 0;
-    final uint8Image = resized.convert(numChannels: 3);
-    for (int y = 0; y < h; y++) {
-      for (int x = 0; x < w; x++) {
-        final pixel = uint8Image.getPixel(x, y);
-        inputBytes[idx++] = pixel.r.toInt();
-        inputBytes[idx++] = pixel.g.toInt();
-        inputBytes[idx++] = pixel.b.toInt();
-      }
-    }
-
-    final outputShape = _tfliteInterpreter!.getOutputTensor(0).shape;
-    int outputSize = 1;
-    for (final d in outputShape) {
-      outputSize *= d;
-    }
-    final outputBytes = Uint8List(outputSize);
-
-    _tfliteInterpreter!.run(inputBytes.buffer, outputBytes.buffer);
-
-    return _rankUint8(outputBytes, def.hasBackgroundClass);
+    final data = jsonDecode(resp.body);
+    final content = data['content'] as List?;
+    final text = (content != null && content.isNotEmpty)
+        ? content.first['text'] as String?
+        : null;
+    if (text == null) throw Exception('${def.displayName} returned no result.');
+    return _parseGuesses(text);
   }
 
-  static List<String> _runOnnx(CvModelDef def, img.Image resized) {
-    final h = def.inputSize;
-    final w = def.inputSize;
-    final inputData = Float32List(1 * 3 * h * w);
+  static Future<List<String>> _identifyOpenAi(
+    String base64Image,
+    String apiKey,
+  ) async {
+    const def = kOpenAiProvider;
+    final uri = Uri.parse('https://api.openai.com/v1/chat/completions');
+    final resp = await http
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $apiKey',
+          },
+          body: jsonEncode({
+            'model': def.model,
+            'max_tokens': 256,
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {'type': 'text', 'text': _kPrompt},
+                  {
+                    'type': 'image_url',
+                    'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    _logResponse(def.displayName, resp);
+    _checkResponse(resp, def.displayName);
 
-    final mean = def.normMean;
-    final std = def.normStd;
-    final uint8Image = resized.convert(numChannels: 3);
+    final data = jsonDecode(resp.body);
+    final text = data['choices']?[0]?['message']?['content'] as String?;
+    if (text == null) throw Exception('${def.displayName} returned no result.');
+    return _parseGuesses(text);
+  }
 
-    for (int y = 0; y < h; y++) {
-      for (int x = 0; x < w; x++) {
-        final pixel = uint8Image.getPixel(x, y);
-        final r = pixel.r / 255.0;
-        final g = pixel.g / 255.0;
-        final b = pixel.b / 255.0;
-        inputData[0 * h * w + y * w + x] = (r - mean[0]) / std[0];
-        inputData[1 * h * w + y * w + x] = (g - mean[1]) / std[1];
-        inputData[2 * h * w + y * w + x] = (b - mean[2]) / std[2];
-      }
-    }
-
-    final inputName = _ortSession!.inputNames.isNotEmpty
-        ? _ortSession!.inputNames.first
-        : 'pixel_values';
-
-    final inputTensor = OrtValueTensor.createTensorWithDataList(
-      inputData,
-      [1, 3, h, w],
+  static void _logResponse(String providerName, http.Response resp) {
+    const maxLen = 4000;
+    final body = resp.body.length > maxLen
+        ? '${resp.body.substring(0, maxLen)}… [truncated]'
+        : resp.body;
+    AppLogger.log(
+      _kLogTag,
+      '$providerName response — status=${resp.statusCode} body=$body',
     );
+  }
 
-    final runOptions = OrtRunOptions();
-    List<OrtValue?>? outputs;
+  static void _checkResponse(http.Response resp, String providerName) {
+    if (resp.statusCode == 401 || resp.statusCode == 403) {
+      throw Exception(
+        '$providerName rejected the API key. Check it in Settings.',
+      );
+    }
+    if (resp.statusCode == 429) {
+      throw Exception('$providerName rate limit reached. Try again shortly.');
+    }
+    if (resp.statusCode != 200) {
+      throw Exception('$providerName request failed (${resp.statusCode}).');
+    }
+  }
+
+  static List<String> _parseGuesses(String text) {
+    var t = text.trim();
+    if (t.startsWith('```')) {
+      t = t
+          .replaceFirst(RegExp(r'^```[a-zA-Z]*\n?'), '')
+          .replaceFirst(RegExp(r'```\s*$'), '')
+          .trim();
+    }
+
     try {
-      outputs = _ortSession!.run(runOptions, {inputName: inputTensor});
-    } finally {
-      inputTensor.release();
-      runOptions.release();
-    }
+      final decoded = jsonDecode(t);
+      if (decoded is List) {
+        return decoded
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .take(5)
+            .toList();
+      }
+    } catch (_) {}
 
-    try {
-      if (def.isZeroShot) {
-        return _rankZeroShot(outputs?.first?.value);
-      } else {
-        return _rankFloat(outputs?.first?.value, def.hasBackgroundClass);
-      }
-    } finally {
-      if (outputs != null) {
-        for (final o in outputs) {
-          o?.release();
-        }
-      }
-    }
+    return t
+        .split('\n')
+        .map((l) => l.replaceFirst(RegExp(r'^[\-\*\d\.\)]+\s*'), '').trim())
+        .where((l) => l.isNotEmpty)
+        .take(5)
+        .toList();
   }
-
-  static List<String> _rankUint8(Uint8List output, bool hasBackground) {
-    final labels = _labels!;
-    final indices = List<int>.generate(output.length, (i) => i);
-    indices.sort((a, b) => output[b].compareTo(output[a]));
-
-    final results = <String>[];
-    for (final j in indices) {
-      if (results.length >= 5) break;
-      String label;
-      if (hasBackground) {
-        if (j == 0) continue;
-        if (j >= labels.length) continue;
-        label = labels[j];
-      } else {
-        final li = j + 1;
-        if (li >= labels.length) continue;
-        label = labels[li];
-      }
-      label = label.trim();
-      if (label.isEmpty || label.toLowerCase() == 'background') continue;
-      results.add(label);
-    }
-    return results;
-  }
-
-  static List<String> _rankFloat(dynamic outputValue, bool hasBackground) {
-    List<double> scores;
-    if (outputValue is List) {
-      try {
-        scores = (outputValue[0] as List).cast<double>();
-      } catch (_) {
-        scores = (outputValue as List).cast<double>();
-      }
-    } else {
-      return [];
-    }
-
-    final labels = _labels!;
-    final indices = List<int>.generate(scores.length, (i) => i);
-    indices.sort((a, b) => scores[b].compareTo(scores[a]));
-
-    final results = <String>[];
-    for (final j in indices) {
-      if (results.length >= 5) break;
-      String label;
-      if (hasBackground) {
-        if (j == 0) continue;
-        if (j >= labels.length) continue;
-        label = labels[j];
-      } else {
-        final li = j + 1;
-        if (li >= labels.length) continue;
-        label = labels[li];
-      }
-      label = label.trim();
-      if (label.isEmpty || label.toLowerCase() == 'background') continue;
-      results.add(label);
-    }
-    return results;
-  }
-
-  static List<String> _rankZeroShot(dynamic outputValue) {
-    List<double> embedding;
-    if (outputValue is List) {
-      try {
-        embedding = (outputValue[0] as List).cast<double>();
-      } catch (_) {
-        embedding = (outputValue as List).cast<double>();
-      }
-    } else {
-      return [];
-    }
-
-    final embedDim = _embedDim!;
-    final textEmb = _textEmbeddings!;
-    final numClasses = textEmb.length ~/ embedDim;
-
-    double norm = 0.0;
-    for (final v in embedding) {
-      norm += v * v;
-    }
-    norm = math.sqrt(norm) + 1e-8;
-    final normEmb = Float32List(embedding.length);
-    for (int i = 0; i < embedding.length; i++) {
-      normEmb[i] = embedding[i] / norm;
-    }
-
-    final scores = Float32List(numClasses);
-    for (int c = 0; c < numClasses; c++) {
-      double dot = 0.0;
-      final offset = c * embedDim;
-      for (int d = 0; d < embedDim; d++) {
-        dot += normEmb[d] * textEmb[offset + d];
-      }
-      scores[c] = dot;
-    }
-
-    final labels = _labels!;
-    final indices = List<int>.generate(numClasses, (i) => i);
-    indices.sort((a, b) => scores[b].compareTo(scores[a]));
-
-    final results = <String>[];
-    for (final j in indices) {
-      if (results.length >= 5) break;
-      final li = j + 1;
-      if (li >= labels.length) continue;
-      final label = labels[li].trim();
-      if (label.isEmpty || label.toLowerCase() == 'background') continue;
-      results.add(label);
-    }
-    return results;
-  }
-
-  static void _disposeCurrentModel() {
-    _tfliteInterpreter?.close();
-    _tfliteInterpreter = null;
-    _ortSession?.release();
-    _ortSession = null;
-    _labels = null;
-    _textEmbeddings = null;
-    _embedDim = null;
-    _loadedTier = null;
-  }
-
-  static void _ensureOrtEnv() {
-    if (!_ortEnvInitialized) {
-      OrtEnv.instance.init();
-      _ortEnvInitialized = true;
-    }
-  }
-
-  static void dispose() => _disposeCurrentModel();
-
-  static void invalidate() => _disposeCurrentModel();
 }

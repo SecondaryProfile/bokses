@@ -1,16 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import '../models/box.dart';
@@ -41,7 +37,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   int _bulkDone = 0;
   int _bulkTotal = 0;
   final _picker = ImagePicker();
-  String _docsDir = '';
   ScaffoldMessengerState? _messenger;
   Timer? _snackTimer;
 
@@ -61,9 +56,6 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   @override
   void initState() {
     super.initState();
-    getApplicationDocumentsDirectory()
-        .then((d) => _docsDir = d.path)
-        .catchError((_) => '');
     _loadSettings();
     _load();
   }
@@ -73,17 +65,11 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     if (mounted) setState(() => _loadAll = loadAll);
   }
 
-  String? _resolvePath(String? stored) {
-    if (stored == null || stored.isEmpty) return null;
-    if (stored.startsWith('data:') ||
-        stored.startsWith('http') ||
-        stored.startsWith('blob:') ||
-        stored.startsWith('/')) {
-      return stored;
-    }
-    if (_docsDir.isEmpty) return null;
-    return '$_docsDir/$stored';
-  }
+  /// Photos are stored as self-contained `data:` URIs, or as `http`/`blob:`
+  /// URLs for web-search results and in-browser captures — all directly
+  /// loadable, so there is nothing left to resolve.
+  String? _resolvePath(String? stored) =>
+      (stored == null || stored.isEmpty) ? null : stored;
 
   Future<void> _load() async {
     final items = await DatabaseService.instance.getItemsForBox(widget.box.id);
@@ -208,26 +194,17 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       {double height = 120, bool editable = false, bool webPhoto = false, VoidCallback? onTap}) {
     Widget inner;
     if (path != null && path.isNotEmpty) {
-      Widget img;
-      if (kIsWeb || path.startsWith('blob:') || path.startsWith('http')) {
-        img = Image.network(path,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Center(
-                child: Icon(Icons.broken_image_rounded,
-                    color: AppTheme.textMid)));
-      } else if (path.startsWith('data:')) {
-        img = Image.memory(base64Decode(path.split(',').last),
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Center(
-                child: Icon(Icons.broken_image_rounded,
-                    color: AppTheme.textMid)));
-      } else {
-        img = Image.file(File(path),
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Center(
-                child: Icon(Icons.broken_image_rounded,
-                    color: AppTheme.textMid)));
-      }
+      final Widget img = path.startsWith('data:')
+          ? Image.memory(base64Decode(path.split(',').last),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Center(
+                  child: Icon(Icons.broken_image_rounded,
+                      color: AppTheme.textMid)))
+          : Image.network(path,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Center(
+                  child: Icon(Icons.broken_image_rounded,
+                      color: AppTheme.textMid)));
       inner = Stack(
         fit: StackFit.expand,
         children: [
@@ -316,8 +293,10 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom +
+                MediaQuery.of(ctx).padding.bottom,
+          ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
             decoration: BoxDecoration(
@@ -646,8 +625,10 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom +
+                MediaQuery.of(ctx).padding.bottom,
+          ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
             decoration: BoxDecoration(
@@ -690,26 +671,31 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   const SizedBox(height: 20),
 
                   // ── Photo ──────────────────────────────────────────────────
-                  _buildPhotoWidget(
-                    _resolvePath(photoPath),
-                    height: 160,
-                    editable: true,
-                    webPhoto: isWebPhoto,
-                    onTap: () async {
-                      final path = await _capturePhoto();
-                      if (path != null) {
-                        setModal(() { photoPath = path; isWebPhoto = false; });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
+                  if (photoPath != null) ...[
+                    _buildPhotoWidget(
+                      _resolvePath(photoPath),
+                      height: 160,
+                      editable: true,
+                      webPhoto: isWebPhoto,
+                      onTap: () async {
+                        final path = await _capturePhoto();
+                        if (path != null) {
+                          setModal(() { photoPath = path; isWebPhoto = false; });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                  ],
 
                   // ── Photo action buttons ───────────────────────────────────
                   Row(
+                    mainAxisAlignment: photoPath == null
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
                     children: [
                       _PhotoActionButton(
                         icon: Icons.camera_alt_rounded,
-                        label: 'Camera',
+                        label: photoPath == null ? 'Add Photo' : 'Camera',
                         color: AppTheme.boksBlue,
                         onTap: () async {
                           final path = await _capturePhoto();
@@ -838,46 +824,8 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     final usageCount = await SettingsService.getAutoBoksSuccessCount();
     if (!mounted) return;
 
-    // Request camera permission while BoxDetailScreen is fully visible.
-    // Android's system dialog cannot reliably interrupt a bottom sheet animation,
-    // so this must happen before showModalBottomSheet is called.
-    if (cameraEnabled && !kIsWeb) {
-      try {
-        final status = await Permission.camera.request();
-        if (status.isPermanentlyDenied && mounted) {
-          // ignore: use_build_context_synchronously
-          final goSettings = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Camera Permission',
-                  style: TextStyle(
-                      fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
-              content: const Text(
-                'Camera permission was denied. Open Settings to enable it, '
-                'or disable Camera in AutoBoks settings to use mic-only mode.',
-                style: TextStyle(fontFamily: kFontFamily),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Skip'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Open Settings'),
-                ),
-              ],
-            ),
-          );
-          if (goSettings == true) openAppSettings();
-          return;
-        }
-      } catch (_) {
-        // permission_handler unavailable; let camera package surface the error.
-      }
-      if (!mounted) return;
-    }
-
+    // Camera and mic permission is the browser's own getUserMedia prompt,
+    // raised when the preview starts; a denial surfaces as a CameraException.
     if (usageCount < 10) {
       // ignore: use_build_context_synchronously
       final confirmed = await showDialog<bool>(
@@ -922,10 +870,23 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
           if (!_bulkFilling &&
               !_loading &&
               _items.any((i) => i.photoPath == null || i.photoPath!.isEmpty))
-            IconButton(
-              icon: const Icon(Icons.image_search_rounded),
-              tooltip: 'Auto-fill missing photos',
-              onPressed: _bulkFillImages,
+            Tooltip(
+              message: 'Auto-fill missing photos',
+              child: GestureDetector(
+                onTap: _bulkFillImages,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text('🍀', style: TextStyle(fontSize: 20)),
+                  ),
+                ),
+              ),
             ),
           if (_bulkFilling)
             Padding(
@@ -982,16 +943,24 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          FloatingActionButton(
+          FloatingActionButton.extended(
             heroTag: 'autoboks',
             onPressed: _startAutoBoks,
             backgroundColor: AppTheme.boksBlue,
-            foregroundColor: Colors.white,
             elevation: 2,
-            shape: CircleBorder(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
               side: BorderSide(color: AppTheme.boksRed, width: 2.5),
             ),
-            child: const Icon(Icons.mic_rounded, size: 22),
+            label: const Text(
+              'AutoBoks',
+              style: TextStyle(
+                fontFamily: kFontFamily,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: Color(0xFFFFD740),
+              ),
+            ),
           ),
           const SizedBox(height: 10),
           FloatingActionButton.extended(
@@ -1304,11 +1273,10 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
           .timeout(const Duration(seconds: 6), onTimeout: () => false);
     } catch (_) {}
 
-    // TTS setup — awaitSpeakCompletion hangs on web, so skip it there
+    // awaitSpeakCompletion hangs on web, so it is deliberately not enabled.
     try {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.5);
-      if (!kIsWeb) await _tts.awaitSpeakCompletion(true);
     } catch (_) {}
 
     if (!mounted) return;
@@ -1317,9 +1285,7 @@ class _AutoBoksSheetState extends State<AutoBoksSheet> {
     } else {
       setState(() {
         _state = _AutoBoksState.error;
-        _errorMsg = kIsWeb
-            ? 'Speech recognition requires Chrome or Edge on web'
-            : 'Microphone not available';
+        _errorMsg = 'Speech recognition requires Chrome or Edge';
       });
     }
   }
@@ -2357,17 +2323,13 @@ class _PhotoOverlayState extends State<_PhotoOverlay>
   }
 
   Widget _buildImage() {
-    final path = widget.path;
-    if (kIsWeb || path.startsWith('http') || path.startsWith('blob:')) {
-      return Image.network(path,
-          fit: BoxFit.contain, filterQuality: FilterQuality.medium);
-    } else if (_bytes != null) {
-      return Image.memory(_bytes!,
-          fit: BoxFit.contain, filterQuality: FilterQuality.medium);
-    } else {
-      return Image.file(File(path),
+    final bytes = _bytes;
+    if (bytes != null) {
+      return Image.memory(bytes,
           fit: BoxFit.contain, filterQuality: FilterQuality.medium);
     }
+    return Image.network(widget.path,
+        fit: BoxFit.contain, filterQuality: FilterQuality.medium);
   }
 
   @override

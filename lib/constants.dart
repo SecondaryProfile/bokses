@@ -1,7 +1,19 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.10';
+const String kAppVersion = '0.12';
 
 const kChangelog = [
+  (
+    version: '0.12',
+    date: '2026-09-13',
+    changes: [
+      'Model Hub replaced with AI Provider — connect your own Gemini, Claude, or ChatGPT API key for image recognition instead of downloading on-device models',
+      'API keys are encrypted at rest in browser storage and never leave your browser except as part of a direct, user-initiated identify request',
+      'Image recognition requests go straight from your browser to your chosen AI provider over HTTPS — no Bokses server is ever involved',
+      'On-device ONNX model hub, downloads, and the small/medium/large tiers removed',
+      'Bokses is now a web-only app — Android, iOS, macOS, Windows and Linux targets removed',
+      'SysML architecture model and the requirements export tool removed',
+    ],
+  ),
   (
     version: '0.10',
     date: '2026-06-23',
@@ -11,7 +23,6 @@ const kChangelog = [
       'Internet image search — find and set item photos from the web in the add or edit item dialog',
       'Bulk photo fill — one button in a box fills all photo-less items from a web image search',
       'Web-sourced photos marked with a globe badge to distinguish them from camera captures',
-      'SysML v2 architecture model documenting the full Bokses system and formal requirements',
       'Refreshed app icon across all Android screen densities',
       'Bokses wordmark on the home screen now has an outline visible on any background or theme',
       'Box card border thickness unified — grid cards now match list tiles',

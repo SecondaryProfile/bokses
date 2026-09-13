@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, Set<ItemLabel>> _boxLabels = {};
   bool _loading = true;
   bool _loadAll = true;
-  final _menuKey = GlobalKey();
   final Map<String, GlobalKey> _gridKeys = {};
   final Map<String, GlobalKey> _listKeys = {};
   bool _animateSwitch = false;
@@ -430,13 +428,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _snackTimer = Timer(const Duration(milliseconds: 2500), ctrl.close);
   }
 
-  Rect? _getMenuRect() {
-    final box = _menuKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return null;
-    final pos = box.localToGlobal(Offset.zero);
-    return pos & box.size;
-  }
-
   Future<void> _doClearAll() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -468,8 +459,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _doExport() async {
     try {
-      await ImportExportService.exportData(sharePositionOrigin: _getMenuRect());
-      _showSnack(kIsWeb ? 'Export downloaded!' : 'Export saved!');
+      final saved = await ImportExportService.exportData();
+      if (saved) _showSnack('Export downloaded!');
     } catch (e) {
       _showSnack('Export failed: $e');
     }
@@ -604,117 +595,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
               ]
             : [
-                Container(
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(22),
-                    border:
-                        Border.all(color: AppTheme.bubblePurple, width: 1.5),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: _openSearch,
-                        borderRadius: const BorderRadius.horizontal(
-                            left: Radius.circular(22)),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 11),
-                          child: Icon(Icons.search_rounded, size: 23),
-                        ),
-                      ),
-                      Container(
-                          width: 1, height: 22, color: AppTheme.bubblePurple),
-                      PopupMenuButton<String>(
-                        key: _menuKey,
-                        padding: EdgeInsets.zero,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 11),
-                          child: Icon(Icons.more_horiz_rounded, size: 23),
-                        ),
-                        onSelected: (val) async {
-                          final nav = Navigator.of(context);
-                          if (val == 'export') _doExport();
-                          if (val == 'import') _doImport();
-                          if (val == 'clear') _doClearAll();
-                          if (val == 'about') {
-                            nav.push(MaterialPageRoute(
-                                builder: (_) => const AboutScreen()));
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                            value: 'export',
-                            child: ListTile(
-                              leading: Icon(Icons.upload_rounded),
-                              title: Text('Export Data',
-                                  style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontWeight: FontWeight.w600)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'import',
-                            child: ListTile(
-                              leading: Icon(Icons.download_rounded),
-                              title: Text('Import Data',
-                                  style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontWeight: FontWeight.w600)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            value: 'clear',
-                            child: ListTile(
-                              leading: Icon(Icons.delete_sweep_rounded,
-                                  color: Color(0xFFE53935)),
-                              title: Text('Delete All Data',
-                                  style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      color: Color(0xFFE53935),
-                                      fontWeight: FontWeight.w600)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'about',
-                            child: ListTile(
-                              leading: Icon(Icons.info_outline_rounded),
-                              title: Text('About',
-                                  style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontWeight: FontWeight.w600)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                          width: 1, height: 22, color: AppTheme.bubblePurple),
-                      InkWell(
-                        onTap: () async {
-                          await Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const SettingsScreen()));
-                          _load();
-                        },
-                        borderRadius: const BorderRadius.horizontal(
-                            right: Radius.circular(22)),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 11),
-                          child: Icon(Icons.settings_rounded, size: 23),
-                        ),
-                      ),
-                    ],
+                // Search button
+                IconButton(
+                  icon: const Icon(Icons.search_rounded, size: 23),
+                  onPressed: _openSearch,
+                ),
+                // Hamburger → opens right drawer
+                Builder(
+                  builder: (ctx) => IconButton(
+                    icon: const Icon(Icons.menu_rounded, size: 23),
+                    onPressed: () => Scaffold.of(ctx).openEndDrawer(),
                   ),
                 ),
+                const SizedBox(width: 4),
               ],
       ),
       body: _loading
@@ -755,6 +648,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : _GradientFab(onPressed: _showAddBoxDialog)
               .animate()
               .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
+      endDrawer: _buildSidebar(),
     );
     if (!_hasCustomBg) return _scaffold;
     return Stack(
@@ -978,6 +872,233 @@ class _HomeScreenState extends State<HomeScreen> {
                 duration: _animateSwitch ? 200.ms : 300.ms)
             .slideY(begin: _animateSwitch ? 0.05 : 0.1, end: 0);
       },
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Drawer(
+      width: 300,
+      backgroundColor: AppTheme.surface,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.boksBlue.withValues(alpha: 0.12),
+                    AppTheme.boksRed.withValues(alpha: 0.06),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border(
+                  bottom: BorderSide(color: AppTheme.bubblePurple, width: 1),
+                ),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(13),
+                    gradient: LinearGradient(
+                      colors: [AppTheme.boksBlue, AppTheme.boksRed],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'B',
+                      style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    'Bokses',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  Text(
+                    'v$kAppVersion',
+                    style: TextStyle(
+                      fontFamily: kFontFamily,
+                      fontSize: 11,
+                      color: AppTheme.textMid,
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _drawerSection('MAIN'),
+                  _drawerItem(
+                    icon: Icons.settings_rounded,
+                    iconColor: AppTheme.boksBlue,
+                    iconBg: AppTheme.boksBlueLight,
+                    title: 'Settings',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsScreen()),
+                      );
+                      _load();
+                    },
+                  ),
+
+                  const SizedBox(height: 4),
+                  Divider(
+                    color: AppTheme.bubblePurple.withValues(alpha: 0.5),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+
+                  _drawerSection('DATA'),
+                  _drawerItem(
+                    icon: Icons.upload_rounded,
+                    iconColor: AppTheme.boksBlue,
+                    iconBg: AppTheme.boksBlueLight,
+                    title: 'Export',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _doExport();
+                    },
+                  ),
+                  _drawerItem(
+                    icon: Icons.download_rounded,
+                    iconColor: AppTheme.boksBlue,
+                    iconBg: AppTheme.boksBlueLight,
+                    title: 'Import',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _doImport();
+                    },
+                  ),
+
+                  const SizedBox(height: 4),
+                  Divider(
+                    color: AppTheme.bubblePurple.withValues(alpha: 0.5),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  const SizedBox(height: 4),
+
+                  _drawerItem(
+                    icon: Icons.info_outline_rounded,
+                    iconColor: AppTheme.textMid,
+                    iconBg: AppTheme.cardBg,
+                    title: 'About',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AboutScreen()),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 4),
+                  Divider(
+                    color: AppTheme.bubblePurple.withValues(alpha: 0.5),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  const SizedBox(height: 4),
+
+                  _drawerItem(
+                    icon: Icons.delete_sweep_rounded,
+                    iconColor: const Color(0xFFE53935),
+                    iconBg: Color(0xFFE53935).withValues(alpha: 0.1),
+                    title: 'Delete All Data',
+                    titleColor: const Color(0xFFE53935),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _doClearAll();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerSection(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: kFontFamily,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: AppTheme.boksBlueBright,
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    Color? titleColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontFamily: kFontFamily,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: titleColor ?? AppTheme.textDark,
+              ),
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppTheme.textMid, size: 18),
+        ]),
+      ),
     );
   }
 

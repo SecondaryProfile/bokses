@@ -157,15 +157,34 @@ class _ImageSearchSheetState extends State<ImageSearchSheet> {
       return Center(child: CircularProgressIndicator(color: AppTheme.boksBlue));
     }
     if (_error != null) {
+      final isConnectivity = _error!.contains('SocketException') ||
+          _error!.contains('host lookup') ||
+          _error!.contains('NetworkException') ||
+          _error!.contains('TimeoutException') ||
+          _error!.contains('timeout');
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.wifi_off_rounded, size: 40, color: AppTheme.textMid),
-            const SizedBox(height: 12),
-            Text('Could not load images', style: TextStyle(fontFamily: kFontFamily, color: AppTheme.textMid, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(_error!, style: TextStyle(fontFamily: kFontFamily, fontSize: 12, color: AppTheme.textMid), textAlign: TextAlign.center),
+            Icon(Icons.wifi_off_rounded, size: 48, color: AppTheme.textMid),
+            const SizedBox(height: 16),
+            Text(
+              isConnectivity ? 'No Internet Connection' : 'Search Unavailable',
+              style: TextStyle(
+                fontFamily: kFontFamily,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isConnectivity
+                  ? 'Connect to the internet to search for photos.'
+                  : 'Image search is currently unavailable.\nPlease check your connection and try again.',
+              style: TextStyle(fontFamily: kFontFamily, fontSize: 13, color: AppTheme.textMid),
+              textAlign: TextAlign.center,
+            ),
           ]),
         ),
       );

@@ -1,9 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:ui';
-import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/box.dart';
 import '../models/item.dart';
@@ -16,20 +11,19 @@ class ImportExportService {
   static Future<Map<String, dynamic>> buildExportPayload() async {
     final boxes = await DatabaseService.instance.getBoxes();
     final allItems = await DatabaseService.instance.getAllItems();
-    final itemMaps = await Future.wait(allItems.map((item) async {
+    final itemMaps = allItems.map((item) {
       final map = Map<String, dynamic>.from(item.toExportMap());
-      if (item.photoPath != null && item.photoPath!.isNotEmpty) {
-        if (item.photoPath!.startsWith('data:')) {
-          map['photoData'] = item.photoPath!.split(',').last;
-        } else {
-          final file = File(item.photoPath!);
-          if (await file.exists()) {
-            map['photoData'] = base64Encode(await file.readAsBytes());
-          }
+      final photo = item.photoPath;
+      if (photo != null && photo.isNotEmpty) {
+        if (photo.startsWith('data:')) {
+          map['photoData'] = photo.split(',').last;
+        } else if (photo.startsWith('http')) {
+          // Web-search photos are remote URLs — carry the link, not the bytes.
+          map['photoUrl'] = photo;
         }
       }
       return map;
-    }));
+    }).toList();
     return {
       'version': '1.1',
       'app': 'Bokses',
@@ -48,35 +42,11 @@ class ImportExportService {
 
   static String _p(int n) => n.toString().padLeft(2, '0');
 
-  static Future<void> exportData({Rect? sharePositionOrigin}) async {
+  static Future<bool> exportData() async {
     final data = await buildExportPayload();
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-    final filename = _exportFilename();
-
-    if (kIsWeb) {
-      triggerWebDownload(jsonStr, filename);
-      return;
-    }
-
-    final bytes = Uint8List.fromList(utf8.encode(jsonStr));
-    final savedPath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save Bokses Export',
-      fileName: filename,
-      bytes: bytes,
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-
-    if (savedPath != null) return;
-
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$filename');
-    await file.writeAsString(jsonStr);
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: filename,
-      sharePositionOrigin: sharePositionOrigin,
-    );
+    triggerWebDownload(jsonStr, _exportFilename());
+    return true;
   }
 
   // Step 1 — pick a file and return its contents as a JSON string.
@@ -90,11 +60,7 @@ class ImportExportService {
     if (result == null || result.files.isEmpty) return null;
 
     final fileBytes = result.files.first.bytes;
-    if (fileBytes != null) return utf8.decode(fileBytes);
-    if (!kIsWeb && result.files.first.path != null) {
-      return await File(result.files.first.path!).readAsString();
-    }
-    return null;
+    return fileBytes == null ? null : utf8.decode(fileBytes);
   }
 
   // Legacy single-call API kept for compatibility.
@@ -133,8 +99,13 @@ class ImportExportService {
     for (final iMap in itemMaps) {
       final map = Map<String, dynamic>.from(iMap);
       final photoData = map.remove('photoData') as String?;
-      map['photoPath'] =
-          photoData != null ? 'data:image/jpeg;base64,$photoData' : null;
+      final photoUrl = map.remove('photoUrl') as String?;
+      map['photoPath'] = photoData != null
+          ? 'data:image/jpeg;base64,$photoData'
+          : photoUrl;
+      // A restored URL is by definition a web-sourced photo, so it keeps its
+      // globe badge.
+      if (photoUrl != null) map['webPhoto'] = true;
       await DatabaseService.instance.insertItem(Item.fromMap(map));
       itemCount++;
       done++;
@@ -142,4 +113,5 @@ class ImportExportService {
     }
     return 'Imported $boxCount box(es) and $itemCount item(s).';
   }
+
 }

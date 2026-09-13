@@ -18,6 +18,7 @@ import 'package:bokses/services/settings_service.dart';
 import 'package:bokses/theme/app_theme.dart';
 import 'package:bokses/widgets/bubble_widgets.dart';
 import 'package:bokses/widgets/label_badges.dart';
+import 'package:bokses/screens/image_search_sheet.dart';
 
 import 'helpers/fake_database_service.dart';
 
@@ -391,6 +392,44 @@ void main() {
       });
       await ImportExportService.processImportJson(payload);
       expect(_fakeDb.items.first.photoPath, contains('base64,abc123'));
+    });
+
+    test('web photo URL survives an export → import round-trip', () async {
+      const url = 'https://example.com/plate.jpg';
+      await _fakeDb.insertBox(box1());
+      await _fakeDb.insertItem(Item(
+        id: 'item-1',
+        name: 'Red Plate',
+        boxId: 'box-1',
+        createdAt: DateTime(2024, 1, 1),
+        photoPath: url,
+      ));
+
+      final payload = await ImportExportService.buildExportPayload();
+      expect((payload['items'] as List).first['photoUrl'], url);
+      expect(
+          (payload['items'] as List).first.containsKey('photoData'), isFalse);
+
+      final fresh = FakeDatabaseService();
+      DatabaseService.instance = fresh;
+      await ImportExportService.processImportJson(jsonEncode(payload));
+      expect(fresh.items.first.photoPath, url);
+    });
+
+    test('data: photo exports as bytes, not a URL', () async {
+      await _fakeDb.insertBox(box1());
+      await _fakeDb.insertItem(Item(
+        id: 'item-1',
+        name: 'Red Plate',
+        boxId: 'box-1',
+        createdAt: DateTime(2024, 1, 1),
+        photoPath: 'data:image/jpeg;base64,abc123',
+      ));
+
+      final payload = await ImportExportService.buildExportPayload();
+      final item = (payload['items'] as List).first;
+      expect(item['photoData'], 'abc123');
+      expect(item.containsKey('photoUrl'), isFalse);
     });
   });
 
@@ -1353,16 +1392,20 @@ void main() {
   });
 
   group('E2E — settings navigation', () {
-    testWidgets('settings button from home opens SettingsScreen', (t) async {
+    testWidgets('Settings item in sidebar opens SettingsScreen', (t) async {
       await pumpApp(t);
-      await t.tap(find.byIcon(Icons.settings_rounded));
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Settings'));
       await t.pumpAndSettle();
       expect(find.text('Settings'), findsOneWidget);
     });
 
     testWidgets('back from Settings returns to HomeScreen', (t) async {
       await pumpApp(t);
-      await t.tap(find.byIcon(Icons.settings_rounded));
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Settings'));
       await t.pumpAndSettle();
       await t.tap(find.byType(BackButton));
       await t.pumpAndSettle();
@@ -1370,16 +1413,292 @@ void main() {
     });
   });
 
-  group('E2E — three-dots menu', () {
-    testWidgets('About menu item opens AboutScreen', (t) async {
+  group('E2E — sidebar menu', () {
+    testWidgets('About item in sidebar opens AboutScreen', (t) async {
       await pumpApp(t);
-      await t.tap(find.byIcon(Icons.more_horiz_rounded));
+      await t.tap(find.byIcon(Icons.menu_rounded));
       await t.pumpAndSettle();
       await t.tap(find.text('About'));
       await t.pumpAndSettle();
       expect(find.text('About'), findsAtLeastNWidgets(1));
       expect(find.textContaining('Bokses'), findsAtLeastNWidgets(1));
     });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UI — Snackbar auto-dismissal timing
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('Snackbar — auto-dismissal timing', () {
+    testWidgets('box delete snackbar auto-dismisses after 2500 ms', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pump();
+      expect(find.text('Undo'), findsOneWidget);
+      await t.pump(const Duration(milliseconds: 2600));
+      await t.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+    });
+
+    testWidgets('item delete snackbar auto-dismisses', (t) async {
+      await pumpBoxDetail(t, box1(), items: [item1()]);
+      await t.tap(find.byIcon(Icons.more_vert_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pump();
+      expect(find.text('Undo'), findsOneWidget);
+      await t.pump(const Duration(seconds: 5));
+      await t.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+    });
+
+    testWidgets('undo tap before dismissal restores deleted box', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pump();
+      // Undo while snackbar is still up (well before 2500 ms)
+      await t.pump(const Duration(milliseconds: 500));
+      await t.tap(find.text('Undo'));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Stuff'), findsOneWidget);
+    });
+
+    testWidgets('box not restored after snackbar times out', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pump(const Duration(milliseconds: 2600));
+      await t.pumpAndSettle();
+      // Snackbar gone — box must not come back
+      expect(find.text('Kitchen Stuff'), findsNothing);
+      expect(_fakeDb.boxes, isEmpty);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UI — HomeScreen list view mode
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('HomeScreen — list view mode', () {
+    testWidgets('tapping view toggle switches to list tiles', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pumpAndSettle();
+      expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
+      await t.pump(const Duration(milliseconds: 1100)); // drain debounce timer
+    });
+
+    testWidgets('list tile shows box name', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Stuff'), findsOneWidget);
+      await t.pump(const Duration(milliseconds: 1100));
+    });
+
+    testWidgets('list tile shows item count', (t) async {
+      await pumpApp(t, boxes: [box1()], items: [item1(), item2()]);
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('2 items'), findsAtLeastNWidgets(1));
+      await t.pump(const Duration(milliseconds: 1100));
+    });
+
+    testWidgets('tapping list tile navigates to BoxDetailScreen', (t) async {
+      await t.binding.setSurfaceSize(const Size(400, 900));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pump(const Duration(milliseconds: 1100));
+      await t.tap(find.text('Kitchen Stuff'));
+      await t.pumpAndSettle();
+      expect(find.text('Box is empty!'), findsOneWidget);
+    });
+
+    testWidgets('toggling back to grid restores BoxCards', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pumpAndSettle();
+      await t.pump(const Duration(milliseconds: 1100)); // wait for debounce reset
+      await t.tap(find.byIcon(Icons.grid_view_rounded));
+      await t.pumpAndSettle();
+      await t.pump(const Duration(milliseconds: 1100));
+      expect(find.byIcon(Icons.view_list_rounded), findsOneWidget);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UI — HomeScreen list tile swipe actions
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('HomeScreen — list tile swipe', () {
+    Future<void> switchToList(WidgetTester t) async {
+      await t.tap(find.byIcon(Icons.view_list_rounded));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('swipe left reveals Edit and Delete actions', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await switchToList(t);
+      await t.drag(find.text('Kitchen Stuff'), const Offset(-300, 0));
+      await t.pumpAndSettle();
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+      // Drain any pending Slidable auto-close timers before teardown.
+      await t.pump(const Duration(seconds: 10));
+    });
+
+    testWidgets('tapping swipe Delete removes box and shows undo', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await switchToList(t);
+      await t.drag(find.text('Kitchen Stuff'), const Offset(-300, 0));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Stuff'), findsNothing);
+      expect(find.text('Undo'), findsOneWidget);
+    });
+
+    testWidgets('tapping swipe Edit opens pre-populated edit sheet', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await switchToList(t);
+      await t.drag(find.text('Kitchen Stuff'), const Offset(-300, 0));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Edit'));
+      await t.pumpAndSettle();
+      expect(find.text('Edit Box'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Kitchen Stuff'), findsOneWidget);
+    });
+
+    testWidgets('undo after swipe delete restores box', (t) async {
+      await pumpApp(t, boxes: [box1()]);
+      await switchToList(t);
+      await t.drag(find.text('Kitchen Stuff'), const Offset(-300, 0));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Undo'));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Stuff'), findsOneWidget);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NET — ImageSearchSheet initial state and offline UI
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('ImageSearchSheet — initial state', () {
+    Future<void> pumpSheet(WidgetTester t, {String query = ''}) async {
+      AppTheme.setMode(true);
+      AppTheme.setPreset(0);
+      SharedPreferences.setMockInitialValues({});
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.theme,
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => showModalBottomSheet<String>(
+                context: ctx,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => ImageSearchSheet(initialQuery: query),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('Open'));
+      await t.pump();
+    }
+
+    testWidgets('renders sheet title', (t) async {
+      await pumpSheet(t);
+      expect(find.text('Find a Photo Online'), findsOneWidget);
+    });
+
+    testWidgets('shows search text field', (t) async {
+      await pumpSheet(t);
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
+    testWidgets('shows Search button', (t) async {
+      await pumpSheet(t);
+      expect(find.text('Search'), findsOneWidget);
+    });
+
+    testWidgets('shows Openverse attribution text', (t) async {
+      await pumpSheet(t);
+      expect(find.textContaining('Openverse'), findsOneWidget);
+    });
+
+    testWidgets('empty query shows no results and no error', (t) async {
+      await pumpSheet(t);
+      await t.pumpAndSettle();
+      expect(find.text('No Internet Connection'), findsNothing);
+      expect(find.text('Search Unavailable'), findsNothing);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UI — Hamburger menu / end drawer
+  // ══════════════════════════════════════════════════════════════════════════
+
+  group('HomeScreen — hamburger menu', () {
+    testWidgets('hamburger icon renders in app bar', (t) async {
+      await pumpApp(t);
+      expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
+    });
+
+    testWidgets('tapping hamburger opens end drawer', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('Settings'), findsOneWidget);
+    });
+
+    testWidgets('drawer contains all expected items', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Export'), findsOneWidget);
+      expect(find.text('Import'), findsOneWidget);
+      expect(find.text('About'), findsOneWidget);
+      expect(find.text('Delete All Data'), findsOneWidget);
+    });
+
+    testWidgets('drawer shows Bokses branding in header', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('B'), findsAtLeastNWidgets(1));
+      expect(find.text('Bokses'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('tapping Settings in drawer opens SettingsScreen', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Settings'));
+      await t.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('tapping About in drawer opens AboutScreen', (t) async {
+      await pumpApp(t);
+      await t.tap(find.byIcon(Icons.menu_rounded));
+      await t.pumpAndSettle();
+      await t.tap(find.text('About'));
+      await t.pumpAndSettle();
+      expect(find.byType(AboutScreen), findsOneWidget);
+    });
+
   });
 
   group('E2E — label assignment flow', () {
