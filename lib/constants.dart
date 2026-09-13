@@ -1,7 +1,15 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.12';
+const String kAppVersion = '0.13';
 
 const kChangelog = [
+  (
+    version: '0.13',
+    date: '2026-09-13',
+    changes: [
+      'More tests, with a coverage check in CI',
+      'Fixed a few AI provider bugs the new tests caught',
+    ],
+  ),
   (
     version: '0.12',
     date: '2026-09-13',

@@ -1,5 +1,12 @@
 # Bokses — Changelog
 
+## 0.13 — 2026-09-13
+
+- More tests, with a coverage check in CI
+- Fixed a few AI provider bugs the new tests caught
+
+---
+
 ## 0.12 — 2026-09-13
 
 ### Added
