@@ -14,8 +14,11 @@ deploy.sh
 .swiftpm/
 migrate_working_dir/
 
-# macOS resource forks
+# macOS resource forks (written next to every file on exFAT/FAT drives)
 ._*
+
+# Flutter tool metadata
+.metadata
 
 # Claude Code local settings
 .claude/
