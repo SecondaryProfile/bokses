@@ -22,6 +22,8 @@ enum BoxSort { dateAsc, dateDesc, nameAsc, nameDesc }
 
 enum BoxViewMode { grid, list }
 
+enum _ImportMode { merge, replace }
+
 class HomeScreen extends StatefulWidget {
   /// Shown right after the root account is created, to offer importing an
   /// existing Bokses export before the instance is used for real.
@@ -507,6 +509,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (jsonStr == null) return;
       if (!mounted) return;
 
+      final mode = await _askImportMode();
+      if (mode == null) return;
+      if (!mounted) return;
+
       final progress = ValueNotifier<(int, int)?>(null);
 
       showDialog<void>(
@@ -520,6 +526,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       String msg;
       try {
+        if (mode == _ImportMode.replace) {
+          await DatabaseService.instance.clearAll();
+        }
         msg = await ImportExportService.processImportJson(
           jsonStr,
           onProgress: (done, total) => progress.value = (done, total),
@@ -533,6 +542,37 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       _showSnack('Import failed: $e');
     }
+  }
+
+  Future<_ImportMode?> _askImportMode() {
+    return showDialog<_ImportMode>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import data',
+            style: TextStyle(
+                fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
+        content: const Text(
+          'Add the imported boxes and items to what\'s already here, or '
+          'replace everything on this instance with the imported file?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _ImportMode.merge),
+            child: const Text('Add to existing'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, _ImportMode.replace),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935)),
+            child: const Text('Replace everything'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSnack(String msg) {

@@ -1,5 +1,12 @@
 # Bokses — Changelog
 
+## 0.17 — 2026-09-13
+
+- Importing now asks whether to add the file's boxes and items to what's
+  already here, or replace everything on the instance with the imported data
+
+---
+
 ## 0.16 — 2026-09-13
 
 - Box grid now scales its column count to the screen width instead of a fixed
