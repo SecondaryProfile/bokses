@@ -1,5 +1,14 @@
 # Bokses — Changelog
 
+## 0.20 — 2026-09-14
+
+- The hamburger menu moved to the left of the Bokses wordmark and now opens
+  from the left side of the screen instead of the right
+- The About page no longer shows a gradient box icon above the Bokses
+  wordmark
+
+---
+
 ## 0.19 — 2026-09-14
 
 - Fixed and greatly expanded the test suite:

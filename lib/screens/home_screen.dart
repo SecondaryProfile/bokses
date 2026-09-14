@@ -635,7 +635,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.arrow_back_rounded),
                 onPressed: _closeSearch,
               )
-            : null,
+            : Builder(
+                builder: (ctx) => IconButton(
+                  icon: Icon(Icons.menu_rounded,
+                      size: 23, color: _appBarIconColor),
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
         title: _searching
             ? TextField(
                 controller: _searchCtrl,
@@ -706,14 +712,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       size: 23, color: _appBarIconColor),
                   onPressed: _openSearch,
                 ),
-                // Hamburger → opens right drawer
-                Builder(
-                  builder: (ctx) => IconButton(
-                    icon: Icon(Icons.menu_rounded,
-                        size: 23, color: _appBarIconColor),
-                    onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-                  ),
-                ),
                 const SizedBox(width: 4),
               ],
       ),
@@ -755,7 +753,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : _GradientFab(onPressed: _showAddBoxDialog)
               .animate()
               .scale(delay: 300.ms, duration: 400.ms, curve: Curves.elasticOut),
-      endDrawer: _buildSidebar(),
+      drawer: _buildSidebar(),
     );
     if (!_hasCustomBg) return _scaffold;
     return Stack(

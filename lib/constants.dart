@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.19';
+const String kAppVersion = '0.20';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,14 @@ const String kAppVersion = '0.19';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.20',
+    date: '2026-09-14',
+    changes: [
+      'The hamburger menu moved to the left of the Bokses wordmark and now opens from the left side of the screen instead of the right',
+      'The About page no longer shows a gradient box icon above the Bokses wordmark',
+    ],
+  ),
   (
     version: '0.19',
     date: '2026-09-14',
