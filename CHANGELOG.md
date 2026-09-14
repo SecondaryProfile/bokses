@@ -1,5 +1,12 @@
 # Bokses — Changelog
 
+## 0.18 — 2026-09-13
+
+- The clover auto-fill-photos button in a box's app bar now reads "PIAB",
+  and its confirmation dialog is titled "Pic In a Box!"
+
+---
+
 ## 0.17 — 2026-09-13
 
 - Importing now asks whether to add the file's boxes and items to what's

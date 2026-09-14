@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.17';
+const String kAppVersion = '0.18';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,13 @@ const String kAppVersion = '0.17';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.18',
+    date: '2026-09-13',
+    changes: [
+      'The clover auto-fill-photos button in a box\'s app bar now reads "PIAB", and its confirmation dialog is titled "Pic In a Box!"',
+    ],
+  ),
   (
     version: '0.17',
     date: '2026-09-13',
