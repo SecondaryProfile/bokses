@@ -83,6 +83,35 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     }
   }
 
+  Future<void> _showAutoFillComingSoon() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Coming Soon!',
+          style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          'Auto-fill photos (PIAB) is temporarily turned off. The web '
+          'search it relies on isn\'t reliable enough right now, so this '
+          'is on hold while a better source is worked out.\n\n'
+          'You can still add photos one at a time from each item, '
+          'including the "Find online" search.',
+          style: TextStyle(fontFamily: kFontFamily, height: 1.45),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.boksBlue),
+            child: const Text('Got it', style: TextStyle(fontFamily: kFontFamily)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _bulkFillImages() async {
     final targets =
         _items.where((i) => i.photoPath == null || i.photoPath!.isEmpty).toList();
@@ -887,9 +916,13 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
               !_loading &&
               _items.any((i) => i.photoPath == null || i.photoPath!.isEmpty))
             Tooltip(
-              message: 'Auto-fill missing photos',
+              message: kAutoFillPhotosEnabled
+                  ? 'Auto-fill missing photos'
+                  : 'Auto-fill missing photos (coming soon)',
               child: GestureDetector(
-                onTap: _bulkFillImages,
+                onTap: kAutoFillPhotosEnabled
+                    ? _bulkFillImages
+                    : _showAutoFillComingSoon,
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   width: 36,

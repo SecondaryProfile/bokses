@@ -1,12 +1,25 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.21';
+const String kAppVersion = '0.22';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
 /// cards — so they all read as the same visual language.
 const double kBubbleBorderWidth = 7.0;
 
+/// PIAB (bulk auto-fill-photos) scrapes an unofficial DuckDuckGo endpoint
+/// prone to rate-limiting under bursty use — see
+/// https://github.com/SecondaryProfile/bokses/issues/5. Off for now; the
+/// button shows a "coming soon" message instead of running the real search.
+const bool kAutoFillPhotosEnabled = false;
+
 const kChangelog = [
+  (
+    version: '0.22',
+    date: '2026-09-14',
+    changes: [
+      'Auto-fill photos (PIAB) is temporarily turned off — it now shows a "Coming Soon!" message instead of searching, while a more reliable photo source is worked out',
+    ],
+  ),
   (
     version: '0.21',
     date: '2026-09-14',

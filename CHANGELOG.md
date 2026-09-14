@@ -1,5 +1,13 @@
 # Bokses — Changelog
 
+## 0.22 — 2026-09-14
+
+- Auto-fill photos (PIAB) is temporarily turned off — it now shows a
+  "Coming Soon!" message instead of searching, while a more reliable photo
+  source is worked out (tracked in #5)
+
+---
+
 ## 0.21 — 2026-09-14
 
 - The About page no longer shows a gradient box icon above the Bokses
