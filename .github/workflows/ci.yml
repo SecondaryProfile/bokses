@@ -112,7 +112,7 @@ jobs:
       - name: Start the stack
         run: |
           printf 'POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
-          docker tag bokses:ci bokses:latest
+          docker tag bokses:ci ghcr.io/secondaryprofile/bokses:latest
           docker compose up -d --no-build --wait --wait-timeout 180
 
       - name: Smoke test through nginx on port 6692
