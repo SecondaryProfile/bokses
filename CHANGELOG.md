@@ -1,5 +1,18 @@
 # Bokses — Changelog
 
+## 0.14 — 2026-09-14
+
+- Server-backed accounts — Postgres replaces browser-local storage; everyone
+  on the instance signs in and shares the same boxes
+- Root account manages everyone else's accounts, and can turn self-service
+  sign-ups on or off
+- Passwords hashed with Argon2id (19 MiB, 2 iterations); session tokens are
+  random 256-bit values, stored only as a SHA-256 hash
+- Docker Compose deployment: nginx + a Dart API server + Postgres, published
+  to GHCR
+
+---
+
 ## 0.13 — 2026-09-13
 
 - More tests, with a coverage check in CI

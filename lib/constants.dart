@@ -1,7 +1,17 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.13';
+const String kAppVersion = '0.14';
 
 const kChangelog = [
+  (
+    version: '0.14',
+    date: '2026-09-14',
+    changes: [
+      'Bokses is now server-backed — everyone in your household signs in to a shared instance instead of storing boxes locally in the browser',
+      'Accounts, sessions, and a root account that manages everyone else\'s access',
+      'Self-hosted with Docker Compose: nginx + a Dart API server + Postgres',
+      'Passwords hashed with Argon2id; session tokens stored only as a SHA-256 hash',
+    ],
+  ),
   (
     version: '0.13',
     date: '2026-09-13',

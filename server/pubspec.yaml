@@ -1,7 +1,7 @@
 name: bokses_server
 description: API server for self-hosted Bokses — accounts, boxes and items in Postgres.
 publish_to: 'none'
-version: 0.13.0
+version: 0.14.0
 
 environment:
   sdk: ^3.9.0
