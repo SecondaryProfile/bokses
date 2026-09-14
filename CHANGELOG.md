@@ -1,5 +1,26 @@
 # Bokses — Changelog
 
+## 0.19 — 2026-09-14
+
+- Fixed and greatly expanded the test suite:
+  - Client: rewrote the database-service tests against the current
+    server-backed architecture (mocked HTTP instead of the old
+    SharedPreferences assumptions), added a full auth-flow e2e suite
+    (setup, sign-in, sign-up, account management) against a fake in-memory
+    API, and added unit tests for the greeting service
+  - Server: added a full test suite (server/test/) covering setup, auth,
+    rate limiting, account management, and boxes/items — run against a
+    real Postgres — plus unit tests for password hashing and the login
+    rate limiter
+  - Fixed a layout overflow in the box-empty-state screen surfaced by the
+    new coverage, during the box-open/close animation
+- CI runs and enforces both suites again (previously disabled); a GitHub
+  branch-protection rule on `main` now requires all three CI checks to
+  pass before a pull request can merge
+- Total line coverage: 59.5%
+
+---
+
 ## 0.18 — 2026-09-14
 
 - The clover auto-fill-photos button in a box's app bar now reads "PIAB" on
