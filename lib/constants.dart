@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.19';
+const String kAppVersion = '0.21';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,15 @@ const String kAppVersion = '0.19';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.21',
+    date: '2026-09-14',
+    changes: [
+      'The About page no longer shows a gradient box icon above the Bokses wordmark',
+      'Auto-fill-photos (PIAB) is more reliable: spaced-out, randomized request timing instead of a tight burst, and it now stops early with a clear message instead of quietly failing on every remaining item once DuckDuckGo starts rate-limiting',
+      'Failed photo searches during auto-fill are now logged to Settings → Debug Log instead of failing silently',
+    ],
+  ),
   (
     version: '0.19',
     date: '2026-09-14',
