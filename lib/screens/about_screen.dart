@@ -17,32 +17,7 @@ class AboutScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
         child: Column(
           children: [
-            const SizedBox(height: 16),
-
-            // Logo
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.boksBlue, AppTheme.boksRed],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(36),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.boksBlue.withValues(alpha: 0.3),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.inventory_2_rounded,
-                  size: 60, color: Colors.white),
-            ).animate().scale(duration: 700.ms, curve: Curves.elasticOut),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 40),
 
             Text(
               'BOKSES',
