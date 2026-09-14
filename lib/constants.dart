@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.16';
+const String kAppVersion = '0.17';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,13 @@ const String kAppVersion = '0.16';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.17',
+    date: '2026-09-13',
+    changes: [
+      'Importing now asks whether to add the file\'s boxes and items to what\'s already here, or replace everything on the instance with the imported data',
+    ],
+  ),
   (
     version: '0.16',
     date: '2026-09-13',
