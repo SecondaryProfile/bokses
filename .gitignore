@@ -44,6 +44,12 @@ migrate_working_dir/
 /coverage/
 test/coverage_helper_test.dart
 
+# Dart server build output
+server/.dart_tool/
+
+# Local secrets for docker compose (see .env.example)
+.env
+
 # Symbolication related
 app.*.symbols
 

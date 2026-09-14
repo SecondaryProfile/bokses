@@ -1,0 +1,18 @@
+# Keep the build context small and free of secrets and local build output.
+.git
+.github
+.idea
+.vscode
+.claude
+.env
+.env.*
+!.env.example
+
+**/.DS_Store
+**/._*
+
+**/.dart_tool
+**/build
+coverage
+server/test
+test

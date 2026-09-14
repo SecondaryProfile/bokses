@@ -1,0 +1,66 @@
+# Bokses — self-hosted box inventory.
+#
+#   1. cp .env.example .env      and set POSTGRES_PASSWORD
+#   2. docker compose up -d --build
+#   3. open http://localhost:6692 (or this machine's IP) and create the root account
+#
+# Postgres is only reachable from the Bokses container, on an internal network
+# with no published ports. Its data lives in the "bokses-db" volume.
+
+name: bokses
+
+services:
+  bokses:
+    image: ghcr.io/secondaryprofile/bokses:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${BOKSES_PORT:-6692}:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: bokses
+      DB_USER: bokses
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - web
+      - db
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bokses
+      POSTGRES_USER: bokses
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}
+    volumes:
+      - bokses-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bokses -d bokses"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - db
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # Reaches the outside world, so port 6692 can be published.
+  web:
+  # No outside access at all: only bokses and postgres are on it.
+  db:
+    internal: true
+
+volumes:
+  bokses-db:

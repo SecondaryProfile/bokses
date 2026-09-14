@@ -1,76 +1,124 @@
 # Bokses
 
-A bubbly box storage management app — know what's in every box.
+Tidy up your life. Just put it in a box. Deal with it later or reorganize now.
 
-Bokses is a **web-only** Flutter app. There are no mobile or desktop build
-targets; the only output is a static bundle from `flutter build web`, meant to
-be served by any web server or container.
+Bokses is a **self-hosted web app**. There are no mobile or desktop build
+targets for now. You run your own instance with Docker, everyone in your
+household signs in to it from a browser, and everyone shares the same boxes.
 
-## Requirements
+## Self-hosting with Docker
 
-- Flutter 3.x (stable channel)
-- A Chromium-based browser for development — AutoBoks and BoksTalk use the Web
-  Speech API, which Firefox and Safari do not implement.
+Requirements: Docker with Compose v2.
 
-## Running locally
-
-```sh
-flutter pub get
-flutter run -d chrome
-```
-
-## Building
+- Download the repo
+- cd into bokses/ directory.
 
 ```sh
-flutter build web --release
+cp .env.example .env
+# edit .env and set POSTGRES_PASSWORD to something long and random,
+# e.g. the output of: openssl rand -base64 24
+docker compose up -d --build
 ```
 
-The bundle lands in `build/web/`. It is fully static — no backend, no server
-component.
+The first build downloads Flutter and takes several minutes; later builds are
+cached.
+
+Open [http://localhost:6692](http://localhost:6692) on the machine running
+Bokses. From other devices on your network, use that machine's IP address
+instead of `localhost`, for example `http://192.168.1.50:6692`. The first
+screen asks you to create the
+**root account**, which manages everyone else's accounts. After that, people
+can create their own accounts from the sign-in screen (root can turn sign-ups
+off under **Settings → Account**).
+
+What's running:
+
+| Container  | What it does | Reachable from |
+|------------|--------------|----------------|
+| `bokses`   | nginx serving the web app on port 8080 (published as 6692), proxying `/api` to the Dart API server inside the same container | your network, on port 6692 |
+| `postgres` | PostgreSQL 17; data in the `bokses-db` volume | only the `bokses` container |
+
+- **Updating:** `docker compose pull && docker compose up -d`. Database changes
+  are applied automatically when the API starts. If you're building from a
+  local checkout instead of the published image, use
+  `git pull && docker compose up -d --build`.
+- **Backups:** use **Settings → Export** in the app, or dump the database:
+  `docker compose exec postgres pg_dump -U bokses bokses > bokses.sql`.
+- **Changing the port:** set `BOKSES_PORT` in `.env`.
+- **Don't expose it to the internet as-is.** It speaks plain HTTP. If you want
+  remote access, put it behind a VPN (e.g. Tailscale) or an HTTPS reverse proxy
+  that sets `X-Forwarded-Proto: https`. Bokses then marks the session cookie
+  `Secure`.
+
+## Accounts and security
+
+- **Passwords are never stored.** Each one is hashed with **Argon2id** (OWASP's
+  recommended settings: 19 MiB memory, 2 iterations) with its own random salt.
+  A copy of the database doesn't reveal anyone's password.
+- **Sessions** are random 256-bit tokens in an `HttpOnly`, `SameSite=Strict`
+  cookie that page scripts can't read. The database stores only a SHA-256 of
+  each token, so a stolen database can't be used to sign in. Sessions last 30
+  days; signing out ends them on the server.
+- **Brute force:** failed sign-ins are rate-limited per IP and per username, and
+  a wrong username takes as long to reject as a wrong password, so response
+  times don't reveal which accounts exist.
+- **Root** can add accounts, reset passwords (which signs that person out),
+  delete accounts, and turn sign-ups on or off. Root itself can't be deleted,
+  and the database guarantees there is only ever one.
+- Changing your own password signs out your other devices.
+- Postgres has no published port and sits on a Docker network with no outside
+  access. The API server listens only inside the `bokses` container. Both
+  containers run with `no-new-privileges`, and the `bokses` container runs as a
+  non-root user with a read-only filesystem.
 
 ## Where data lives
 
-Everything is client-side, per browser profile:
-
-- **Boxes, items and settings** — `SharedPreferences`, backed by
-  `localStorage`.
-- **Photos** — stored inline as `data:` URIs, except web-search results, which
-  are kept as remote URLs.
-- **AI provider API keys** — `flutter_secure_storage`, which on web is
-  AES-encrypted `localStorage`. That keeps keys out of plain storage and logs,
-  but it is only as private as the browser profile: a shared machine is a
-  shared key.
-- **Debug log** — an in-memory rolling buffer for the current tab only.
-
-Clearing site data wipes all of it, so use **Settings → Export** for backups.
+- **Boxes, items and accounts:** Postgres, shared by everyone on the instance.
+  Each box and item records who created and last changed it.
+- **Photos:** stored in the database as `data:` URIs, except web-search results,
+  which are kept as remote URLs.
+- **Per-browser settings** (theme, background, AutoBoks options):
+  `SharedPreferences`, backed by `localStorage`.
+- **AI provider API keys:** `flutter_secure_storage`, which on web is
+  AES-encrypted `localStorage`. They never reach the Bokses server, but they are
+  only as private as the browser profile: a shared machine is a shared key.
+- **Debug log:** an in-memory rolling buffer for the current tab only.
 
 ## AI image recognition
 
-Bokses has no server of its own. Image-recognition requests go straight from
-the browser to whichever provider you configured (Gemini, Claude, or ChatGPT)
-using your own API key. Note that this means those requests are subject to the
-provider's CORS policy, and that the key is exposed to the browser — use a
-key scoped to this purpose.
+Image-recognition requests go straight from the browser to whichever provider
+you configured (Gemini, Claude, or ChatGPT) using your own API key. The Bokses
+server is not involved. These requests are subject to the provider's CORS
+policy, and the key is exposed to the browser, so use a key scoped to this
+purpose.
 
-## Tests
+## Project layout
 
-```sh
-tool/coverage.sh                     # all tests + per-file coverage report
-MIN_COVERAGE=55 tool/coverage.sh     # same, failing below 55% (what CI does)
+```
+lib/            Flutter web app
+server/         Dart API server (shelf + Postgres) — its own Dart package
+docker/         nginx config and container entrypoint
+Dockerfile      builds the single bokses image
+docker-compose.yml
 ```
 
-`test/widget_test.dart` covers models, screens and user flows against an
-in-memory `FakeDatabaseService`. `test/services/` covers the real
-SharedPreferences-backed `DatabaseService` and the AI provider stack
-(`VisionService`, `SecureKeyStore`, `AiVisionSettingsService`) with HTTP
-answered by a `MockClient` — no network access or real API keys needed.
+## Releasing (maintainers)
 
-If the project lives on an exFAT/FAT drive, pass test files explicitly
-(`flutter test test/widget_test.dart`) or use `tool/coverage.sh`: macOS writes
-a `._*_test.dart` file beside each test there, and `flutter test` hangs trying
-to load it.
+Publishing to GHCR happens on version tags, not on every push to `main`:
 
-Tests run on the Dart VM rather than in a browser, which is why the download
-helper is split across `lib/services/web_download.dart` (VM stub) and
-`web_download_web.dart` (the real `dart:html` implementation), selected by a
-conditional import.
+1. Bump the version in **both** `pubspec.yaml` and `server/pubspec.yaml` to the
+   same `X.Y.Z` (they're allowed to diverge in build metadata, e.g.
+   `0.14.0+14`, but the `X.Y.Z` part must match each other and the tag).
+2. Merge that to `main`.
+3. Tag it and push the tag: `git tag v0.14.0 && git push origin v0.14.0`.
+
+CI then re-runs the full test suite against that commit and, if it passes,
+builds a multi-arch (`amd64`/`arm64`) image and pushes
+`ghcr.io/secondaryprofile/bokses:0.14.0` and `:latest`. The version-match check
+fails the workflow (before anything is pushed) if the tag and the two
+`pubspec.yaml` versions disagree.
+
+The first time this runs, the resulting GHCR package is **private** by
+default — visit its package settings on GitHub and change visibility to
+**Public** so `docker compose pull` works for people who haven't
+authenticated. Later releases don't need this step repeated.

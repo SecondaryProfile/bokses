@@ -7,6 +7,7 @@ import '../services/ai_vision_settings_service.dart';
 import '../models/ai_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
+import 'account_screen.dart';
 import 'ai_provider_screen.dart';
 import 'debug_log_screen.dart';
 import 'version_history_screen.dart';
@@ -566,6 +567,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ],
+          ]),
+          const SizedBox(height: 28),
+
+          // ── ACCOUNT ─────────────────────────────────────────────────────────────
+          _sectionLabel('ACCOUNT'),
+          _settingsGroup([
+            _settingsTile(
+              icon: Icons.person_outline_rounded,
+              iconColor: AppTheme.boksBlue,
+              iconBg: AppTheme.boksBlueLight,
+              title: 'Account',
+              subtitle: 'Change your password, sign out, or manage accounts',
+              trailing: Icon(Icons.chevron_right_rounded, color: AppTheme.textMid),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AccountScreen()),
+              ),
+            ),
           ]),
           const SizedBox(height: 28),
 
