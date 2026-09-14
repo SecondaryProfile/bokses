@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -16,6 +17,7 @@ import '../services/settings_service.dart';
 import '../widgets/label_badges.dart';
 import '../services/vision_service.dart';
 import '../services/image_search_service.dart';
+import '../services/app_logger.dart';
 import 'image_search_sheet.dart';
 import '../theme/app_theme.dart';
 import '../constants.dart';
@@ -135,7 +137,9 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
       _bulkTotal = targets.length;
     });
 
+    final random = Random();
     int filled = 0;
+    bool blocked = false;
     for (final item in targets) {
       if (!mounted) break;
       try {
@@ -147,26 +151,38 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
           item.webPhoto = true;
           await DatabaseService.instance.updateItem(item);
           filled++;
+        } else {
+          AppLogger.log('ImageSearch', 'No results for "${item.name}"');
         }
-      } catch (_) {
-        // skip items where the search or download fails
+      } on ImageSearchBlockedException catch (e) {
+        // DuckDuckGo is rate-limiting us — more requests right now would
+        // just make it worse. Stop instead of burning through every
+        // remaining item on a search that's going to keep failing.
+        AppLogger.logError('ImageSearch', '${item.name}: $e');
+        blocked = true;
+        break;
+      } catch (e) {
+        AppLogger.logError('ImageSearch', 'Failed for "${item.name}": $e');
       }
       if (mounted) setState(() => _bulkDone++);
-      // Brief pause between requests to avoid rate-limiting.
-      await Future.delayed(const Duration(milliseconds: 600));
+      // A randomized pause between items, instead of a fixed one, so the
+      // request pattern looks less like an automated burst to DuckDuckGo.
+      await Future.delayed(Duration(milliseconds: 900 + random.nextInt(700)));
     }
 
     if (!mounted) return;
     setState(() => _bulkFilling = false);
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          filled == targets.length
+      final message = blocked
+          ? 'Added $filled of ${targets.length} photos, then stopped — '
+              'DuckDuckGo is rate-limiting search requests. Try the rest '
+              'again in a few minutes.'
+          : filled == targets.length
               ? 'Added photos to $filled item${filled == 1 ? '' : 's'}.'
-              : 'Added $filled of ${targets.length} photos — some searches failed.',
-        ),
-      ));
+              : 'Added $filled of ${targets.length} photos — some searches '
+                  'failed (see Settings → Debug Log for details).';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 

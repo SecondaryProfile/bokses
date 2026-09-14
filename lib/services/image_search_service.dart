@@ -13,6 +13,19 @@ class ImageSearchResult {
   });
 }
 
+/// Thrown when DuckDuckGo itself rejects the request (HTTP 403/429) — this
+/// isn't a Bokses bug, it's their anti-bot/rate-limit protection on the
+/// unofficial endpoint this service scrapes. Once it starts happening, more
+/// requests in quick succession just make it worse, so callers doing several
+/// searches in a row (e.g. bulk auto-fill) should stop instead of retrying.
+class ImageSearchBlockedException implements Exception {
+  final int statusCode;
+  const ImageSearchBlockedException(this.statusCode);
+  @override
+  String toString() =>
+      'DuckDuckGo is rate-limiting image search requests (HTTP $statusCode). Try again in a few minutes.';
+}
+
 class ImageSearchService {
   // Realistic mobile browser headers — DDG blocks obvious bot requests.
   static const _headers = {
@@ -21,6 +34,12 @@ class ImageSearchService {
         'Chrome/120.0.0.0 Mobile Safari/537.36',
     'Accept-Language': 'en-US,en;q=0.9',
   };
+
+  static void _checkBlocked(http.Response res) {
+    if (res.statusCode == 403 || res.statusCode == 429) {
+      throw ImageSearchBlockedException(res.statusCode);
+    }
+  }
 
   static Future<List<ImageSearchResult>> search(String query) async {
     // ── Step 1: load the DDG images page to get the session token (vqd) ──────
@@ -33,11 +52,17 @@ class ImageSearchService {
           headers: {..._headers, 'Accept': 'text/html'},
         )
         .timeout(const Duration(seconds: 12));
+    _checkBlocked(initRes);
 
     final vqd = _extractVqd(initRes.body);
     if (vqd == null) {
       throw Exception('Image search unavailable — could not get session token.');
     }
+
+    // A short gap between the two DuckDuckGo requests, instead of firing
+    // them back-to-back — bursty request pairs are exactly what trips their
+    // rate limiting the fastest.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
 
     // ── Step 2: call the JSON image API ──────────────────────────────────────
     final searchRes = await http
@@ -56,6 +81,7 @@ class ImageSearchService {
           },
         )
         .timeout(const Duration(seconds: 12));
+    _checkBlocked(searchRes);
 
     if (searchRes.statusCode != 200) {
       throw Exception('Image search failed (HTTP ${searchRes.statusCode}).');
@@ -91,6 +117,7 @@ class ImageSearchService {
           },
         )
         .timeout(const Duration(seconds: 15));
+    _checkBlocked(res);
 
     if (res.statusCode != 200) {
       throw Exception('Image download failed (HTTP ${res.statusCode}).');
