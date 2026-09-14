@@ -23,7 +23,11 @@ enum BoxSort { dateAsc, dateDesc, nameAsc, nameDesc }
 enum BoxViewMode { grid, list }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// Shown right after the root account is created, to offer importing an
+  /// existing Bokses export before the instance is used for real.
+  final bool promptImport;
+
+  const HomeScreen({super.key, this.promptImport = false});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -83,6 +87,37 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchCtrl.addListener(_onSearchChanged);
     _load();
     _loadBackground();
+    if (widget.promptImport) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _showImportPrompt());
+    }
+  }
+
+  Future<void> _showImportPrompt() async {
+    if (!mounted) return;
+    final wantsImport = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import existing data?',
+            style: TextStyle(
+                fontFamily: kFontFamily, fontWeight: FontWeight.w800)),
+        content: const Text(
+          'Do you want to import an existing Bokses file? You can also do '
+          'this later from the menu.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+    if (wantsImport == true) await _doImport();
   }
 
   @override
@@ -558,8 +593,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontFamily: kFontFamily,
                       fontWeight: FontWeight.w900,
-                      fontSize: 30,
-                      letterSpacing: -0.5,
+                      fontSize: 34,
+                      letterSpacing: 3.5,
                       foreground: Paint()
                         ..style = PaintingStyle.stroke
                         ..strokeWidth = 4
@@ -577,8 +612,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontFamily: kFontFamily,
                         fontWeight: FontWeight.w900,
-                        fontSize: 30,
-                        letterSpacing: -0.5,
+                        fontSize: 34,
+                        letterSpacing: 3.5,
                         color: Colors.white,
                       ),
                     ),
@@ -824,8 +859,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final boxes = _sortedBoxes;
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width > 700 ? 3 : 2,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
         childAspectRatio: 0.82,
@@ -1184,7 +1219,7 @@ class _SortButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          border: Border.all(color: AppTheme.bubblePurple, width: kBubbleBorderWidth),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1272,7 +1307,7 @@ class _ViewToggleButtonState extends State<_ViewToggleButton> {
           decoration: BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+            border: Border.all(color: AppTheme.bubblePurple, width: kBubbleBorderWidth),
           ),
           child: Icon(
             widget.mode == BoxViewMode.grid
@@ -1385,7 +1420,7 @@ class _BoxCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accentColor, width: 7.0),
+          border: Border.all(color: accentColor, width: kBubbleBorderWidth),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1588,7 +1623,7 @@ class _BoxListTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: accentColor, width: 7.0),
+                border: Border.all(color: accentColor, width: kBubbleBorderWidth),
               ),
               child: IntrinsicHeight(
                 child: Row(

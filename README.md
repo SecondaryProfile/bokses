@@ -11,6 +11,8 @@ household signs in to it from a browser, and everyone shares the same boxes.
 Requirements: Docker with Compose v2.
 
 ```sh
+( Go to where you want the app to live )
+mkdir -p bokses
 git clone https://github.com/SecondaryProfile/bokses.git
 cd bokses
 cp .env.example .env

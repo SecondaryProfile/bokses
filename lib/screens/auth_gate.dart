@@ -21,6 +21,7 @@ class _AuthGateState extends State<AuthGate> {
   bool _checking = true;
   bool _needsSetup = false;
   bool _signupsEnabled = false;
+  bool _justCompletedSetup = false;
   String? _loadError;
 
   @override
@@ -78,7 +79,10 @@ class _AuthGateState extends State<AuthGate> {
     if (_needsSetup) {
       return AuthScreen(
         mode: AuthMode.setup,
-        onSignedIn: () => setState(() => _needsSetup = false),
+        onSignedIn: () => setState(() {
+          _needsSetup = false;
+          _justCompletedSetup = true;
+        }),
       );
     }
 
@@ -92,7 +96,7 @@ class _AuthGateState extends State<AuthGate> {
             onSignedIn: () {}, // currentAccount already updated; this rebuild handles it
           );
         }
-        return const HomeScreen();
+        return HomeScreen(promptImport: _justCompletedSetup);
       },
     );
   }

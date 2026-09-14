@@ -1,5 +1,19 @@
 # Bokses — Changelog
 
+## 0.16 — 2026-09-13
+
+- Box grid now scales its column count to the screen width instead of a fixed
+  3 columns, so tiles stay a reasonable size on ultrawide monitors instead of
+  stretching huge
+- Bokses wordmark on the home screen is bigger and more spaced out
+- After creating the root account, you're asked whether you want to import an
+  existing Bokses export
+- "Allow sign-ups" now defaults to on for new instances
+- Changelog, settings, home screen controls, and about page cards use the
+  same border thickness as box tiles
+
+---
+
 ## 0.15 — 2026-09-13
 
 Rollback and cleanup.

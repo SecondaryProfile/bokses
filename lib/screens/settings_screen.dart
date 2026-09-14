@@ -657,7 +657,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+        border: Border.all(color: AppTheme.bubblePurple, width: kBubbleBorderWidth),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

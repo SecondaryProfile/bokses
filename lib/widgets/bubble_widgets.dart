@@ -35,7 +35,7 @@ class BoksCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: color ?? AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.bubblePurple, width: 1.5),
+          border: Border.all(color: AppTheme.bubblePurple, width: kBubbleBorderWidth),
         ),
         child: child,
       ),
