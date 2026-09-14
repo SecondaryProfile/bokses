@@ -1025,10 +1025,15 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     final itemBorderColor =
         (widget.accentColor ?? AppTheme.boksBlue).withValues(alpha: 0.5);
     return SlidableAutoCloseBehavior(
-      child: ListView.separated(
+      child: GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 440,
+        mainAxisExtent: 98,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 12,
+      ),
       itemCount: _items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
         final item = _items[i];
         final card = ClipRRect(

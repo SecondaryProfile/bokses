@@ -50,6 +50,12 @@ server/.dart_tool/
 # Local secrets for docker compose (see .env.example)
 .env
 
+# Sample data for testing import/export locally — not meant to be shared
+test-data.json
+
+# Sidebar greeting variations — per-instance wording, see web/greetings.csv.example
+web/greetings.csv
+
 # Symbolication related
 app.*.symbols
 
