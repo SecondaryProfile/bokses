@@ -26,7 +26,7 @@ cached.
 
 Open [http://localhost:6692](http://localhost:6692) on the machine running
 Bokses. From other devices on your network, use that machine's IP address
-instead of `localhost`, for example `http://192.168.1.50:6692`. The first
+instead of `localhost`. The first
 screen asks you to create the
 **root account**, which manages everyone else's accounts. After that, people
 can create their own accounts from the sign-in screen (root can turn sign-ups
@@ -41,6 +41,9 @@ What's running:
 
 - **Updating:** `git pull && docker compose up -d --build`. Database changes
   are applied automatically when the API starts.
+- **Rebuilding:** `./rebuild.sh` stops the stack, rebuilds the image from the
+  current source, and starts it back up again — handy after pulling changes
+  or editing files locally.
 - **Backups:** use **Settings → Export** in the app, or dump the database:
   `docker compose exec postgres pg_dump -U bokses bokses > bokses.sql`.
 - **Changing the port:** set `BOKSES_PORT` in `.env`.

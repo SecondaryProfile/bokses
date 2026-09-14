@@ -360,7 +360,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: selected
                             ? Icon(Icons.check_rounded,
-                                color: c == 0xFFFFFFFF
+                                color: ThemeData.estimateBrightnessForColor(
+                                            Color(c)) ==
+                                        Brightness.light
                                     ? Colors.black54
                                     : Colors.white,
                                 size: 18)
@@ -786,11 +788,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   static const _bgPresetColors = [
-    // Dark
-    0xFF0C0C0E, 0xFF1A1A2E, 0xFF0F3460, 0xFF2D1B69,
-    0xFF1B4332, 0xFF3B1313, 0xFF2C3E50, 0xFF4A0E0E,
-    // Light
-    0xFFFFFFFF, 0xFFF5F5F7, 0xFFE8E8EC, 0xFFD4D4D8,
+    0xFF000000, // Black
+    0xFFFFFFFF, // White
+    0xFF2563EB, // Blue
+    0xFFDC2626, // Red
+    0xFF16A34A, // Green
   ];
 }
 

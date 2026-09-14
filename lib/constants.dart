@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.17';
+const String kAppVersion = '0.18';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,20 @@ const String kAppVersion = '0.17';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.18',
+    date: '2026-09-14',
+    changes: [
+      'The clover auto-fill-photos button in a box\'s app bar now reads "PIAB" on a fixed green/black design that stays consistent on every theme, and its confirmation dialog is titled "Pic In a Box!"',
+      'Home screen box/item counts are now plain text separated by a "|" instead of pill badges',
+      'The Bokses wordmark on the home screen is bolder',
+      'A box\'s item list scales its column count to the screen width instead of a fixed single column, so wide screens show multiple items per row instead of one skinny row with empty space beside it',
+      'Home screen icons now stay legible against a Solid background color of any shade, instead of blending into it',
+      'The Solid background color picker now offers 5 clearly distinct colors instead of 12 similar dark/light shades',
+      'The sidebar now greets you by name with one of 20 rotating variations instead of always showing "Bokses", and its avatar shows your initial instead of a fixed "B"',
+      'The sidebar version line now reads "Using Bokses v0.18"',
+    ],
+  ),
   (
     version: '0.17',
     date: '2026-09-13',

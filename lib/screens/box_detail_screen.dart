@@ -98,7 +98,7 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          'Auto-fill Photos?',
+          'Pic In a Box!',
           style: TextStyle(fontFamily: kFontFamily, fontWeight: FontWeight.w800),
         ),
         content: Text(
@@ -878,12 +878,19 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black, width: 2),
                   ),
                   child: const Center(
-                    child: Text('🍀', style: TextStyle(fontSize: 20)),
+                    child: Text('PIAB',
+                        style: TextStyle(
+                            fontFamily: kFontFamily,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                            color: Colors.black)),
                   ),
                 ),
               ),
@@ -1018,10 +1025,15 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
     final itemBorderColor =
         (widget.accentColor ?? AppTheme.boksBlue).withValues(alpha: 0.5);
     return SlidableAutoCloseBehavior(
-      child: ListView.separated(
+      child: GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 440,
+        mainAxisExtent: 98,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 12,
+      ),
       itemCount: _items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
         final item = _items[i];
         final card = ClipRRect(

@@ -8,7 +8,9 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:uuid/uuid.dart';
 import '../models/box.dart';
 import '../models/item.dart';
+import '../services/auth_service.dart';
 import '../services/database_service.dart';
+import '../services/greeting_service.dart';
 import '../services/import_export_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
@@ -41,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, Set<ItemLabel>> _boxLabels = {};
   bool _loading = true;
   bool _loadAll = true;
+  String? _greeting;
   final Map<String, GlobalKey> _gridKeys = {};
   final Map<String, GlobalKey> _listKeys = {};
   bool _animateSwitch = false;
@@ -61,6 +64,26 @@ class _HomeScreenState extends State<HomeScreen> {
   int _bgColor = 0xFF0C0C0E;
 
   bool get _hasCustomBg => _bgType != AppBgType.none;
+
+  /// Icons drawn directly over the app bar (not behind a solid surface) need
+  /// to stay legible against whatever custom background is picked in
+  /// Settings. For a solid color there's one exact color to contrast
+  /// against; gradient/image backgrounds keep the theme's default since
+  /// there's no single color to invert.
+  Color? get _appBarIconColor {
+    if (_bgType != AppBgType.solid) return null;
+    return ThemeData.estimateBrightnessForColor(Color(_bgColor)) ==
+            Brightness.light
+        ? Colors.black
+        : Colors.white;
+  }
+
+  String get _userInitial {
+    final username = AuthService.instance.currentAccount.value?.username;
+    return (username == null || username.isEmpty)
+        ? 'B'
+        : username[0].toUpperCase();
+  }
 
   List<Box> get _sortedBoxes {
     final list = List<Box>.from(_boxes);
@@ -89,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchCtrl.addListener(_onSearchChanged);
     _load();
     _loadBackground();
+    _loadGreeting();
     if (widget.promptImport) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _showImportPrompt());
@@ -155,6 +179,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _bgBlur = blur;
       _bgColor = color;
     });
+  }
+
+  Future<void> _loadGreeting() async {
+    final username = AuthService.instance.currentAccount.value?.username;
+    final greeting = await GreetingService.greetingFor(username ?? 'there');
+    if (mounted) setState(() => _greeting = greeting);
   }
 
   Widget _buildBackground() {
@@ -637,7 +667,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 3.5,
                       foreground: Paint()
                         ..style = PaintingStyle.stroke
-                        ..strokeWidth = 4
+                        ..strokeWidth = 6.5
                         ..color = Colors.black.withValues(alpha: 0.28),
                     ),
                   ),
@@ -672,13 +702,15 @@ class _HomeScreenState extends State<HomeScreen> {
             : [
                 // Search button
                 IconButton(
-                  icon: const Icon(Icons.search_rounded, size: 23),
+                  icon: Icon(Icons.search_rounded,
+                      size: 23, color: _appBarIconColor),
                   onPressed: _openSearch,
                 ),
                 // Hamburger → opens right drawer
                 Builder(
                   builder: (ctx) => IconButton(
-                    icon: const Icon(Icons.menu_rounded, size: 23),
+                    icon: Icon(Icons.menu_rounded,
+                        size: 23, color: _appBarIconColor),
                     onPressed: () => Scaffold.of(ctx).openEndDrawer(),
                   ),
                 ),
@@ -818,25 +850,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _summaryText(String text, Color color) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontFamily: kFontFamily,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: color,
+        shadows: _hasCustomBg
+            ? [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ]
+            : null,
+      ),
+    );
+  }
+
   Widget _summaryBar() {
     final totalItems = _itemCounts.values.fold(0, (a, b) => a + b);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       child: Row(
         children: [
-          _StatChip(
-            icon: Icons.inventory_2_rounded,
-            label: '${_boxes.length} box${_boxes.length == 1 ? '' : 'es'}',
-            color: AppTheme.boksBlueBright,
-            bgColor: AppTheme.boksBlueLight,
-          ),
-          const SizedBox(width: 8),
-          _StatChip(
-            icon: Icons.layers_rounded,
-            label: '$totalItems item${totalItems == 1 ? '' : 's'}',
-            color: AppTheme.boksRedBright,
-            bgColor: AppTheme.boksRedLight,
-          ),
+          _summaryText(
+              '${_boxes.length} box${_boxes.length == 1 ? '' : 'es'}',
+              AppTheme.boksBlueBright),
+          const SizedBox(width: 10),
+          _summaryText('|', AppTheme.textMid),
+          const SizedBox(width: 10),
+          _summaryText(
+              '$totalItems item${totalItems == 1 ? '' : 's'}',
+              AppTheme.boksRedBright),
           const Spacer(),
           _SortButton(
             sort: _sort,
@@ -985,9 +1034,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       colors: [AppTheme.boksBlue, AppTheme.boksRed],
                     ),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'B',
+                      _userInitial,
                       style: TextStyle(
                         fontFamily: kFontFamily,
                         fontSize: 24,
@@ -998,25 +1047,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 14),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                    'Bokses',
-                    style: TextStyle(
-                      fontFamily: kFontFamily,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textDark,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _greeting ??
+                            'Hi, ${AuthService.instance.currentAccount.value?.username ?? 'there'}!',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                      Text(
+                        'Using Bokses v$kAppVersion',
+                        style: TextStyle(
+                          fontFamily: kFontFamily,
+                          fontSize: 11,
+                          color: AppTheme.textMid,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    'v$kAppVersion',
-                    style: TextStyle(
-                      fontFamily: kFontFamily,
-                      fontSize: 11,
-                      color: AppTheme.textMid,
-                    ),
-                  ),
-                ]),
+                ),
               ]),
             ),
 
