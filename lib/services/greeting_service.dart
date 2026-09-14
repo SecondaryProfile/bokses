@@ -15,6 +15,9 @@ class GreetingService {
 
   static final _random = Random();
 
+  /// Overridable in tests; defaults to a plain [http.Client] otherwise.
+  static http.Client Function() clientFactory = http.Client.new;
+
   static Future<String> greetingFor(String name) async {
     final templates = await _loadTemplates();
     final template = templates[_random.nextInt(templates.length)];
@@ -22,8 +25,9 @@ class GreetingService {
   }
 
   static Future<List<String>> _loadTemplates() async {
+    final client = clientFactory();
     try {
-      final res = await http
+      final res = await client
           .get(Uri.base.resolve('greetings.csv'))
           .timeout(const Duration(seconds: 3));
       if (res.statusCode != 200) return _fallbackTemplates;
@@ -35,6 +39,8 @@ class GreetingService {
       return lines.isEmpty ? _fallbackTemplates : lines;
     } catch (_) {
       return _fallbackTemplates;
+    } finally {
+      client.close();
     }
   }
 }

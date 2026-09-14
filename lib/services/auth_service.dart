@@ -7,7 +7,7 @@ import 'api_client.dart';
 /// listens to [currentAccount] rather than polling — it changes on sign-in,
 /// sign-out, and setup.
 class AuthService {
-  static final AuthService instance = AuthService._internal(ApiClient());
+  static AuthService instance = AuthService._internal(ApiClient());
   AuthService._internal(this._api);
   AuthService.forTesting(ApiClient api) : _api = api;
 

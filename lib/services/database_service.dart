@@ -9,7 +9,10 @@ import 'api_client.dart';
 class DatabaseService {
   static DatabaseService instance = DatabaseService._internal(ApiClient());
   DatabaseService._internal(this._api);
-  DatabaseService.forTesting() : _api = ApiClient(); // subclasses override everything
+  // Subclasses (e.g. FakeDatabaseService) override every method and never
+  // touch _api; an explicit ApiClient lets non-subclassed tests exercise the
+  // real request/response plumbing against a mock client instead.
+  DatabaseService.forTesting([ApiClient? api]) : _api = api ?? ApiClient();
 
   final ApiClient _api;
 

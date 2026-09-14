@@ -985,38 +985,45 @@ class _BoxDetailScreenState extends State<BoxDetailScreen> {
   }
 
   Widget _emptyState() {
+    // The box-open/close transition (see _BoxOpenRoute in home_screen.dart)
+    // briefly lays this out at the small source box card's size while
+    // animating, which a plain Column can overflow — a SingleChildScrollView
+    // absorbs that instead of throwing, with no visible effect once settled.
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppTheme.boksRedLight,
-              borderRadius: BorderRadius.circular(32),
-            ),
-            child:
-                Icon(Icons.category_outlined, size: 52, color: AppTheme.boksRed),
-          ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
-          const SizedBox(height: 28),
-          const Text('Box is empty!',
-                  style: TextStyle(
-                      fontFamily: kFontFamily,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800))
-              .animate()
-              .fadeIn(delay: 200.ms),
-          const SizedBox(height: 8),
-          Text(
-            'Add items to keep track of\nwhat\'s inside.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontFamily: kFontFamily,
-                fontSize: 16,
-                color: AppTheme.textMid),
-          ).animate().fadeIn(delay: 300.ms),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: AppTheme.boksRedLight,
+                borderRadius: BorderRadius.circular(32),
+              ),
+              child: Icon(Icons.category_outlined,
+                  size: 52, color: AppTheme.boksRed),
+            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+            const SizedBox(height: 28),
+            const Text('Box is empty!',
+                    style: TextStyle(
+                        fontFamily: kFontFamily,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800))
+                .animate()
+                .fadeIn(delay: 200.ms),
+            const SizedBox(height: 8),
+            Text(
+              'Add items to keep track of\nwhat\'s inside.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontFamily: kFontFamily,
+                  fontSize: 16,
+                  color: AppTheme.textMid),
+            ).animate().fadeIn(delay: 300.ms),
+          ],
+        ),
       ),
     );
   }

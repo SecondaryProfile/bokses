@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.18';
+const String kAppVersion = '0.19';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -7,6 +7,15 @@ const String kAppVersion = '0.18';
 const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.19',
+    date: '2026-09-14',
+    changes: [
+      'Fixed and greatly expanded the test suite: unit and end-to-end coverage for accounts, sign-in/sign-up, boxes and items, and a full server-side test suite backed by a real Postgres',
+      'CI now runs and enforces both the app and server test suites, and a GitHub branch-protection rule requires them to pass before a pull request can merge',
+      'Fixed a layout overflow in the box-empty-state screen during the box-open/close animation',
+    ],
+  ),
   (
     version: '0.18',
     date: '2026-09-14',
