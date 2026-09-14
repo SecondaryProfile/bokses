@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*.*.*']
   pull_request:
     branches: [main]
 
@@ -112,7 +111,7 @@ jobs:
       - name: Start the stack
         run: |
           printf 'POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
-          docker tag bokses:ci ghcr.io/secondaryprofile/bokses:latest
+          docker tag bokses:ci bokses-bokses:latest
           docker compose up -d --no-build --wait --wait-timeout 180
 
       - name: Smoke test through nginx on port 6692
@@ -150,61 +149,3 @@ jobs:
           docker compose run --rm --no-deps bokses 2>&1 | tee refuse.log || true
           grep -q 'still the placeholder' refuse.log
           docker compose down -v
-
-  publish:
-    name: Publish image to GHCR
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [app, server, docker]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Tag must match pubspec versions
-        run: |
-          set -eu
-          tag_version="${GITHUB_REF_NAME#v}"
-          app_version="$(grep -m1 '^version:' pubspec.yaml | sed 's/^version: *//; s/+.*//')"
-          server_version="$(grep -m1 '^version:' server/pubspec.yaml | sed 's/^version: *//')"
-          echo "tag=$tag_version app=$app_version server=$server_version"
-          if [ "$tag_version" != "$app_version" ]; then
-            echo "::error::Tag v$tag_version doesn't match pubspec.yaml version $app_version"
-            exit 1
-          fi
-          if [ "$tag_version" != "$server_version" ]; then
-            echo "::error::Tag v$tag_version doesn't match server/pubspec.yaml version $server_version"
-            exit 1
-          fi
-
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/secondaryprofile/bokses
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

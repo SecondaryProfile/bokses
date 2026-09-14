@@ -1,5 +1,17 @@
 # Bokses — Changelog
 
+## 0.15 — 2026-09-13
+
+Rollback and cleanup.
+
+- Reverted GHCR image publishing — CI no longer builds or pushes images;
+  self-hosting is git clone + `docker compose up -d --build`
+- Removed the `publish` CI job and the tag-triggered release workflow
+- README and `docker-compose.yml` updated to match; GHCR distribution moved
+  to the roadmap for later
+
+---
+
 ## 0.14 — 2026-09-14
 
 - Server-backed accounts — Postgres replaces browser-local storage; everyone

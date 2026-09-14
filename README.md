@@ -10,10 +10,9 @@ household signs in to it from a browser, and everyone shares the same boxes.
 
 Requirements: Docker with Compose v2.
 
-- Download the repo
-- cd into bokses/ directory.
-
 ```sh
+git clone https://github.com/SecondaryProfile/bokses.git
+cd bokses
 cp .env.example .env
 # edit .env and set POSTGRES_PASSWORD to something long and random,
 # e.g. the output of: openssl rand -base64 24
@@ -38,10 +37,8 @@ What's running:
 | `bokses`   | nginx serving the web app on port 8080 (published as 6692), proxying `/api` to the Dart API server inside the same container | your network, on port 6692 |
 | `postgres` | PostgreSQL 17; data in the `bokses-db` volume | only the `bokses` container |
 
-- **Updating:** `docker compose pull && docker compose up -d`. Database changes
-  are applied automatically when the API starts. If you're building from a
-  local checkout instead of the published image, use
-  `git pull && docker compose up -d --build`.
+- **Updating:** `git pull && docker compose up -d --build`. Database changes
+  are applied automatically when the API starts.
 - **Backups:** use **Settings → Export** in the app, or dump the database:
   `docker compose exec postgres pg_dump -U bokses bokses > bokses.sql`.
 - **Changing the port:** set `BOKSES_PORT` in `.env`.
@@ -102,23 +99,3 @@ Dockerfile      builds the single bokses image
 docker-compose.yml
 ```
 
-## Releasing (maintainers)
-
-Publishing to GHCR happens on version tags, not on every push to `main`:
-
-1. Bump the version in **both** `pubspec.yaml` and `server/pubspec.yaml` to the
-   same `X.Y.Z` (they're allowed to diverge in build metadata, e.g.
-   `0.14.0+14`, but the `X.Y.Z` part must match each other and the tag).
-2. Merge that to `main`.
-3. Tag it and push the tag: `git tag v0.14.0 && git push origin v0.14.0`.
-
-CI then re-runs the full test suite against that commit and, if it passes,
-builds a multi-arch (`amd64`/`arm64`) image and pushes
-`ghcr.io/secondaryprofile/bokses:0.14.0` and `:latest`. The version-match check
-fails the workflow (before anything is pushed) if the tag and the two
-`pubspec.yaml` versions disagree.
-
-The first time this runs, the resulting GHCR package is **private** by
-default — visit its package settings on GitHub and change visibility to
-**Public** so `docker compose pull` works for people who haven't
-authenticated. Later releases don't need this step repeated.
