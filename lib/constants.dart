@@ -1,7 +1,23 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.14';
+const String kAppVersion = '0.16';
+
+/// Border thickness shared by every "bubble" card — box tiles on the home
+/// screen, and the changelog / settings / home screen controls / about page
+/// cards — so they all read as the same visual language.
+const double kBubbleBorderWidth = 7.0;
 
 const kChangelog = [
+  (
+    version: '0.16',
+    date: '2026-09-13',
+    changes: [
+      'Box grid scales its column count to the screen width instead of a fixed 3 columns — tiles stay a reasonable size on ultrawide monitors instead of stretching huge',
+      'Bokses wordmark on the home screen is bigger and more spaced out',
+      'After creating the root account, you\'re asked whether you want to import an existing Bokses export',
+      '"Allow sign-ups" now defaults to on for new instances',
+      'Changelog, settings, home screen controls, and about page cards use the same border thickness as box tiles',
+    ],
+  ),
   (
     version: '0.14',
     date: '2026-09-14',

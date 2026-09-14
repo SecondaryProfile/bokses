@@ -112,7 +112,7 @@ class Store {
     final r = await _db.execute(
       Sql.named("SELECT value FROM settings WHERE key = 'signups_enabled'"),
     );
-    if (r.isEmpty) return false;
+    if (r.isEmpty) return true;
     return r.first.toColumnMap()['value'] == 'true';
   }
 
