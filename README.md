@@ -104,3 +104,7 @@ Dockerfile      builds the single bokses image
 docker-compose.yml
 ```
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned work that isn't scheduled yet.
+
