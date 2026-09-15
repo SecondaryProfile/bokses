@@ -18,6 +18,7 @@ import '../constants.dart';
 import '../widgets/label_badges.dart';
 import 'box_detail_screen.dart';
 import 'about_screen.dart';
+import 'report_bug_dialog.dart';
 import 'settings_screen.dart';
 
 enum BoxSort { dateAsc, dateDesc, nameAsc, nameDesc }
@@ -1147,6 +1148,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute(
                             builder: (_) => const AboutScreen()),
                       );
+                    },
+                  ),
+                  _drawerItem(
+                    icon: Icons.bug_report_outlined,
+                    iconColor: AppTheme.textMid,
+                    iconBg: AppTheme.cardBg,
+                    title: 'Report a Bug',
+                    onTap: () {
+                      Navigator.pop(context);
+                      showReportBugDialog(context);
                     },
                   ),
 
