@@ -1,5 +1,14 @@
 # Bokses — Changelog
 
+## 0.23 — 2026-09-14
+
+- New "Report a Bug" option in the sidebar — prompts for a title and steps
+  to reproduce, then opens a prefilled GitHub issue in a new tab for you
+  to review and submit yourself. No server component, no stored GitHub
+  token — nothing is sent until you approve it on GitHub's own page.
+
+---
+
 ## 0.22 — 2026-09-14
 
 - Auto-fill photos (PIAB) is temporarily turned off — it now shows a

@@ -1,5 +1,5 @@
 const String kFontFamily = 'Trebuchet MS';
-const String kAppVersion = '0.22';
+const String kAppVersion = '0.23';
 
 /// Border thickness shared by every "bubble" card — box tiles on the home
 /// screen, and the changelog / settings / home screen controls / about page
@@ -13,6 +13,13 @@ const double kBubbleBorderWidth = 7.0;
 const bool kAutoFillPhotosEnabled = false;
 
 const kChangelog = [
+  (
+    version: '0.23',
+    date: '2026-09-14',
+    changes: [
+      'New "Report a Bug" option in the sidebar — prompts for a title and steps to reproduce, then opens a prefilled GitHub issue in a new tab for you to review and submit yourself',
+    ],
+  ),
   (
     version: '0.22',
     date: '2026-09-14',
